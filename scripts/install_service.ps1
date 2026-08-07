@@ -23,5 +23,11 @@ if (-not (Get-Command nssm -ErrorAction SilentlyContinue)) {
 & nssm install $ServiceName $Python $("-m uvicorn app.main:app --host 0.0.0.0 --port 8808 --workers 1 --app-dir `"$AppDir`"")
 & nssm set $ServiceName AppDirectory $AppDir
 & nssm set $ServiceName Start SERVICE_AUTO_START
+Write-Host "Running first-run auto-config..."
+& $Python "$AppDir\\scripts\\auto_config.py"
+Write-Host "Installing Python dependencies..."
+& $Python -m pip install --upgrade pip
+& $Python -m pip install -r "$AppDir\\requirements.txt"
+Write-Host "Starting service..."
 & nssm start $ServiceName
 Write-Host "Installation complete. Verify with: http://localhost:8808/healthz"
