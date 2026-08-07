@@ -28,12 +28,10 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger("zqm_ai.webhook")
 
-from app.core.config import settings
+router = APIRouter(prefix="/api/webhook", tags=["webhooks"])
 
-router = APIRouter(prefix="/api/webhook", tags=["Webhooks"])
-
-GITHUB_WEBHOOK_SECRET = settings.github_webhook_secret
-GITHUB_TOKEN = settings.github_token
+# ---------------------------------------------------------------------------
+# Config
 # ---------------------------------------------------------------------------
 
 ZQM_INTERNAL_KEY = os.getenv("ZQM_INTERNAL_KEY", "")
@@ -199,16 +197,6 @@ async def github_webhook(
 
     payload = json.loads(body)
     delivery_id = x_github_event or "unknown"
-
-    # Enforce configured GitHub target repo when set.
-    if settings.github_repo_name:
-        repo_full = payload.get("repository", {}).get("full_name", "")
-        expected = f"{settings.github_repo_owner}/{settings.github_repo_name}"
-        if repo_full and repo_full != expected:
-            raise HTTPException(
-                status.HTTP_403_FORBIDDEN,
-                f"Repository mismatch: expected {expected}, got {repo_full}",
-            )
 
     # Route by event type
     handlers = {
@@ -532,6 +520,76 @@ async def deploy_webhook(deploy: DeploymentWebhook):
     return {"status": "received", "app": deploy.app_name, "result": result}
 
 
+
+@router.post("/dealwork", summary="Dealwork.ai marketplace webhook")
+async def dealwork_webhook(
+    request: Request,
+    x_agent_id: Optional[str] = Header(None, alias="X-Agent-ID"),
+    x_timestamp: Optional[str] = Header(None, alias="X-Timestamp"),
+    x_signature: Optional[str] = Header(None, alias="X-Signature"),
+):
+    """
+    Receive dealwork.ai marketplace events.
+
+    Configure in dealwork.ai agent settings → Webhooks:
+      URL: https://<public-host>/api/webhook/dealwork
+      Events: bid.accepted, contract.started, message.received
+      Auth: HMAC-SHA256 via X-Agent-ID, X-Timestamp, X-Signature
+    """
+    try:
+        body = await request.body()
+        payload = json.loads(body)
+    except Exception as e:
+        logger.exception("[dealwork] bad request body")
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"success": False, "error": f"bad body: {e}"},
+        )
+
+    event_type = payload.get("type") or payload.get("event") or "unknown"
+    summary = f"Dealwork event: {event_type}"
+
+    # HMAC-SHA256 verification
+    secret = os.getenv("DEALWORK_WEBHOOK_SECRET", "")
+    if not secret:
+        logger.warning("[dealwork] webhook secret not configured")
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"success": False, "error": "Webhook secret not configured"},
+        )
+
+    if not x_agent_id or not x_timestamp or not x_signature:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Missing webhook auth headers")
+
+    try:
+        ts = float(x_timestamp)
+    except (TypeError, ValueError):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid timestamp")
+
+    if abs(time.time() - ts) > 300:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Stale timestamp")
+
+    expected = hmac.new(secret.encode(), (x_agent_id + x_timestamp + body.decode()).encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, x_signature):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Invalid signature")
+
+    data = {
+        "summary": summary,
+        "event_type": event_type,
+        "payload": payload,
+    }
+
+    try:
+        result = await _ingest_webhook_event("dealwork", event_type, data)
+    except Exception as e:
+        logger.exception("[dealwork] ingest failed")
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"success": False, "error": f"ingest failed: {e}"},
+        )
+    return {"status": "received", "event": event_type, "result": result}
+
+
 # ---------------------------------------------------------------------------
 # Health/info
 # ---------------------------------------------------------------------------
@@ -561,6 +619,12 @@ async def webhook_info():
                 "method": "POST",
                 "description": "Generic deployment notifications",
                 "auth": "X-ZQM-Key header",
+            },
+            {
+                "path": "/api/webhook/dealwork",
+                "method": "POST",
+                "description": "Dealwork.ai marketplace events",
+                "auth": "none",
             },
         ],
     }

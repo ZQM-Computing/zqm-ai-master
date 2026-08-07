@@ -1,0 +1,32 @@
+# Sale-ready repository packaging manifest
+# Intended for customer delivery and installer builds.
+
+[artifacts]
+required = [
+  "app/",
+  "scripts/",
+  "docs/",
+  "requirements.txt",
+  "COMMERCIAL_LICENSE.md",
+  "CUSTOMER_INSTALL.md",
+  "docker-compose.yml",
+  ".env.example",
+  "VERSION",
+]
+
+[installers]
+windows = [
+  "scripts/install_service.ps1",
+  "scripts/setup_env.ps1",
+  "scripts/verify_install.ps1",
+]
+
+[branding]
+default_customer_name = "Customer"
+support_email = "admin@zqmlabs.com"
+portal_host = "localhost"
+
+[security]
+must_rotate_default_secret = true
+must_remove_debug_logs = true
+must_redact_internal_ips = true

@@ -305,6 +305,7 @@ DEFAULT_AGENTS: List[Dict[str, Any]] = [
             AgentCapability.MONITORING,
             AgentCapability.API_CALL,
             AgentCapability.DATABASE_QUERY,
+            AgentCapability.TASK_PLANNING,
         ],
         "provider": settings.default_ai_provider,
         "model": "qwen3.6:latest",

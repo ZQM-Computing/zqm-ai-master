@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from app.core.logger import get_logger
 from app.core.security import require_admin, get_current_token_payload
@@ -17,6 +17,24 @@ from app.models.agent import AgentCreate, AgentUpdate
 from app.models.response import ZQM_AIResponse
 
 router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
+
+# Alias: /api/agents -> /api/dashboard/agents
+alias_router = APIRouter(prefix="/api", tags=["Agents Alias"])
+
+
+@alias_router.get(
+    "/agents",
+    include_in_schema=False,
+    summary="Alias for /api/dashboard/agents",
+    description="Passes through pagination query params.",
+)
+async def agents_alias(
+    request: Request,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=200),
+    auth: Dict[str, Any] = Depends(get_current_token_payload),
+):
+    return await list_agents(request, auth=auth, page=page, page_size=page_size)
 log = get_logger("router.dashboard")
 
 
@@ -52,17 +70,31 @@ async def get_dashboard(
     "/agents",
     response_model=ZQM_AIResponse,
     summary="List all agents with status",
+    description="Paginated view of the live agent pool. Use ?page and ?page_size to paginate.",
 )
 async def list_agents(
     request: Request,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=200),
     auth: Dict[str, Any] = Depends(get_current_token_payload),
 ) -> ZQM_AIResponse:
-    """Return all agents in the registry with their current status and metrics."""
+    """Return paginated agents in the registry with their current status and metrics."""
+    from app.models.response import PaginatedResponse
     orchestrator = request.app.state.orchestrator
     summaries = await orchestrator.registry.list_summaries()
+    total = len(summaries)
+    start = (page - 1) * page_size
+    end = start + page_size
+    page_items = summaries[start:end]
+    payload = PaginatedResponse.of(
+        items=[s.model_dump() for s in page_items],
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
     return ZQM_AIResponse.ok(
-        data=[s.model_dump() for s in summaries],
-        message=f"{len(summaries)} agent(s) registered",
+        data=payload.model_dump(),
+        message=f"{total} agent(s) registered",
     )
 
 

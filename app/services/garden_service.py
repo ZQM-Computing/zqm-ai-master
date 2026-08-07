@@ -5,17 +5,18 @@ Version: 2.0.0 | ZQM Computing LLC
 Client for the ZQM Garden distributed compute cluster.
 Manages job submission, node health, and task coordination.
 
-ZQM Garden Nodes (per ZQM topology — Queen == Garden):
-  Garden-0 (primary, GPU): 192.168.1.225  — ZQM-Garden-00 (Queen)
-  Garden-1 (worker):       192.168.1.53   — ZQM-Garden-01.lan (Queen 10)
-  Garden-2 (worker):       192.168.1.37   — ZQM-GARDEN-02.lan
-  Garden-3 (worker):       192.168.1.64   — ZQM-GARDEN-03.lan
-  Garden-4 (worker):       192.168.1.144  — ZQM-GARDEN-04
+ZQM Garden Nodes (live mesh nodes with /api/garden/* available):
+  Garden-0 = N4 / ZQM-Void-N4    192.168.1.228  (primary/Queen)
+  Garden-1 = N1 / ZQM-Void-N1    192.168.1.224  (backup/Queen 10)
+  Garden-2 = N3 / ZQM-Node-3     192.168.1.78
+  Garden-3 = N2 / ZQM-Node-2     192.168.1.31
+  Garden-4 = COMB / zqm-void-pve 192.168.1.225
 """
 
 from __future__ import annotations
 
 import asyncio
+import random
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -36,14 +37,15 @@ class GardenService:
     - Node health checking
     - Load balancing hints
     - Task coordination with ZQM_AIOrchestrator
+    - Node health snapshots, metrics aggregation, failover selection
     """
 
     GARDEN_NODES = [
-        {"id": "garden-0", "ip": settings.garden_node_0, "role": "primary", "gpu": True,  "queen": "Queen"},
-        {"id": "garden-1", "ip": settings.garden_node_1, "role": "worker",  "gpu": False, "queen": "Queen 10"},
-        {"id": "garden-2", "ip": settings.garden_node_2, "role": "worker",  "gpu": False, "queen": "garden-2"},
-        {"id": "garden-3", "ip": settings.garden_node_3, "role": "worker",  "gpu": False, "queen": "garden-3"},
-        {"id": "garden-4", "ip": settings.garden_node_4, "role": "worker",  "gpu": False, "queen": "garden-4"},
+        {"id": "garden-0", "ip": settings.garden_node_0, "api_port": settings.garden_node_0_port, "role": "primary", "gpu": True,  "queen": "Queen"},
+        {"id": "garden-1", "ip": settings.garden_node_1, "api_port": settings.garden_node_1_port, "role": "backup",  "gpu": False, "queen": "Queen 10"},
+        {"id": "garden-2", "ip": settings.garden_node_2, "api_port": settings.garden_node_2_port, "role": "worker",  "gpu": False, "queen": "garden-2"},
+        {"id": "garden-3", "ip": settings.garden_node_3, "api_port": settings.garden_node_3_port, "role": "worker",  "gpu": False, "queen": "garden-3"},
+        {"id": "garden-4", "ip": settings.garden_node_4, "api_port": settings.garden_node_4_port, "role": "worker",  "gpu": False, "queen": "garden-4"},
     ]
 
     def __init__(self) -> None:
@@ -53,37 +55,180 @@ class GardenService:
 
     # ── Health ────────────────────────────────────────────────────────────────
 
+    def _endpoint(self, node: Dict[str, Any], path: str) -> str:
+        port = node.get("api_port", "8808")
+        return f"http://{node['ip']}:{port}{path}"
+
     async def health_check(self) -> bool:
-        """Ping the primary Garden node. Returns True if reachable."""
+        """Ping all configured Garden nodes; True if ANY reachable."""
         try:
-            async with httpx.AsyncClient(timeout=5) as client:
-                resp = await client.get(f"http://{settings.garden_node_0}:8808/api/garden/health")
-                return resp.status_code == 200
-        except Exception as exc:
-            log.debug("Garden health check failed", error=str(exc))
+            results = await asyncio.gather(
+                *[self._ping_node(node) for node in self.GARDEN_NODES],
+                return_exceptions=True,
+            )
+            return any(r is True for r in results)
+        except Exception:
             return False
 
     async def get_online_nodes(self) -> List[str]:
-        """Return IDs of currently reachable Garden nodes."""
-        results = await asyncio.gather(
-            *[self._ping_node(node) for node in self.GARDEN_NODES],
-            return_exceptions=True,
-        )
-        online = [
-            self.GARDEN_NODES[i]["id"]
-            for i, r in enumerate(results)
-            if r is True
-        ]
-        self._online_nodes = online
-        return online
+        """Return IDs of currently reachable Garden nodes with caching."""
+        try:
+            results = await asyncio.gather(
+                *[self._ping_node(node) for node in self.GARDEN_NODES],
+                return_exceptions=True,
+            )
+            online = [
+                self.GARDEN_NODES[i]["id"]
+                for i, r in enumerate(results)
+                if r is True
+            ]
+            self._online_nodes = online
+            return online
+        except Exception:
+            return self._online_nodes or []
 
     async def _ping_node(self, node: Dict[str, Any]) -> bool:
         try:
             async with httpx.AsyncClient(timeout=3) as client:
-                resp = await client.get(f"http://{node['ip']}:8808/api/health")
-                return resp.status_code < 500
+                resp = await client.get(self._endpoint(node, "/api/garden/health"))
+                return resp.status_code == 200
         except Exception:
             return False
+
+    # ── Node Operations ───────────────────────────────────────────────────────
+
+    async def get_node_health_snapshot(self) -> List[Dict[str, Any]]:
+        """Return richer health snapshots for every configured node."""
+        results = await asyncio.gather(
+            *[self._probe_node(node) for node in self.GARDEN_NODES],
+            return_exceptions=True,
+        )
+        snapshot: List[Dict[str, Any]] = []
+        for node, result in zip(self.GARDEN_NODES, results):
+            if isinstance(result, Exception):
+                snapshot.append({
+                    "id": node.get("id"),
+                    "ip": node.get("ip"),
+                    "status": "unreachable",
+                    "error": str(result),
+                })
+            else:
+                snapshot.append(result)
+        return snapshot
+
+    async def _probe_node(self, node: Dict[str, Any]) -> Dict[str, Any]:
+        endpoint = self._endpoint(node, "/api/garden/health")
+        try:
+            async with httpx.AsyncClient(timeout=3) as client:
+                resp = await client.get(endpoint)
+                data: Dict[str, Any] = {}
+                try:
+                    data = resp.json()
+                except Exception:
+                    pass
+                return {
+                    "id": node.get("id"),
+                    "ip": node.get("ip"),
+                    "status": "healthy" if resp.status_code == 200 else ("unsupported" if resp.status_code == 404 else "degraded"),
+                    "http_status": resp.status_code,
+                    "role": node.get("role"),
+                    "gpu": node.get("gpu", False),
+                    "queen": node.get("queen"),
+                    "api_port": node.get("api_port", "8808"),
+                    "metrics": data if isinstance(data, dict) else {},
+                }
+        except Exception as exc:
+            return {
+                "id": node.get("id"),
+                "ip": node.get("ip"),
+                "status": "offline",
+                "error": str(exc),
+                "role": node.get("role"),
+                "gpu": node.get("gpu", False),
+                "queen": node.get("queen"),
+                "api_port": node.get("api_port", "8808"),
+            }
+
+    async def collect_node_metrics(self) -> Dict[str, Any]:
+        """Aggregate metrics across all nodes with per-node fallback."""
+        raw = await self.get_node_metrics()
+        aggregated: Dict[str, Any] = {
+            "nodes_total": len(raw),
+            "nodes_online": 0,
+            "nodes_offline": 0,
+            "by_node": {},
+        }
+        for entry in raw:
+            nid = entry.get("node_id", "unknown")
+            status = entry.get("status", "unknown")
+            aggregated["by_node"][nid] = entry
+            if status == "offline":
+                aggregated["nodes_offline"] += 1
+            else:
+                aggregated["nodes_online"] += 1
+        return aggregated
+
+    async def select_best_node(
+        self,
+        *,
+        gpu_required: bool = False,
+        preferred_node: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Pick the best node by health + capability, not just first online."""
+        if preferred_node:
+            for n in self.GARDEN_NODES:
+                if n.get("id") == preferred_node:
+                    healthy = await self._ping_node(n)
+                    if healthy:
+                        return n
+        candidates: List[tuple[bool, Dict[str, Any]]] = []
+        for n in self.GARDEN_NODES:
+            if gpu_required and not n.get("gpu"):
+                continue
+            try:
+                healthy = await self._ping_node(n)
+            except Exception:
+                healthy = False
+            candidates.append((healthy, n))
+        healthy_nodes = [n for ok, n in candidates if ok]
+        if not healthy_nodes:
+            return None
+        return random.choice(healthy_nodes)
+
+    async def migrate_job(self, job_id: str, from_node: str, to_node: str) -> Dict[str, Any]:
+        """Best-effort job migration signal between garden nodes."""
+        return {
+            "job_id": job_id,
+            "from_node": from_node,
+            "to_node": to_node,
+            "status": "accepted",
+            "note": "Migration is advisory; actual replay depends on target node runtime.",
+        }
+
+    async def convene_cross_node_action(self, action: Dict[str, Any]) -> Dict[str, Any]:
+        """Dispatch an action to the best node with failover."""
+        task_id = action.get("task_id", "unknown")
+        gpu_required = action.get("gpu_required", False)
+        preferred_node = action.get("preferred_node")
+        node = await self.select_best_node(
+            gpu_required=gpu_required,
+            preferred_node=preferred_node,
+        )
+        if node is None:
+            return {
+                "task_id": task_id,
+                "status": "local_fallback",
+                "node": "local",
+                "reason": "no suitable garden node available",
+            }
+        return await self.submit_job(
+            task_id=task_id,
+            task_type=action.get("task_type", "generic"),
+            payload=action.get("payload", {}),
+            strategy="gpu_priority" if gpu_required else "round_robin",
+            preferred_node=node.get("id"),
+            gpu_required=gpu_required,
+        )
 
     # ── Job Submission ────────────────────────────────────────────────────────
 
@@ -120,10 +265,10 @@ class GardenService:
             "zqm_ai_id": settings.zqm_ai_id,
         }
 
-        async def _post_to(node_ip: str) -> Dict[str, Any]:
+        async def _post_to(node_ip: str, port: str) -> Dict[str, Any]:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
                 resp = await client.post(
-                    f"http://{node_ip}:8808{settings.garden_endpoint.rsplit('://',1)[-1].split('/',1)[1]}",
+                    f"http://{node_ip}:{port}/api/garden/coordinate",
                     json=job,
                     headers={"X-ZQM_AI-ID": settings.zqm_ai_id},
                 )
@@ -138,9 +283,15 @@ class GardenService:
                 )
                 return result
 
-        # 1) Try primary first.
+        # 1) Try preferred or primary first.
+        primary_ip = settings.garden_node_0
+        if preferred_node:
+            for n in self.GARDEN_NODES:
+                if n.get("id") == preferred_node:
+                    primary_ip = n["ip"]
+                    break
         try:
-            return await _post_to(settings.garden_node_0)
+            return await _post_to(primary_ip, str(settings.garden_node_0_port))
         except httpx.HTTPError as exc:
             log.warning("Garden primary node submission failed", task_id=task_id, error=str(exc))
         except Exception as exc:
@@ -152,7 +303,8 @@ class GardenService:
         except Exception:
             online = []
         candidates = [
-            n["ip"] for n in self.GARDEN_NODES
+            (n["ip"], n.get("api_port", "8808"))
+            for n in self.GARDEN_NODES
             if n["id"] != "garden-0" and n["id"] in online and not (gpu_required and not n.get("gpu"))
         ]
         if not candidates:
@@ -164,9 +316,9 @@ class GardenService:
                 "message": "Garden unavailable: primary and online fallbacks exhausted",
             }
 
-        for ip in candidates:
+        for ip, port in candidates:
             try:
-                return await _post_to(ip)
+                return await _post_to(ip, port)
             except Exception as exc:
                 log.warning("Garden fallback node failed", task_id=task_id, node=ip, error=str(exc))
                 continue
@@ -183,7 +335,7 @@ class GardenService:
         try:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
                 resp = await client.get(
-                    f"http://{settings.garden_node_0}:8808/api/garden/jobs/{job_id}",
+                    self._endpoint(self.GARDEN_NODES[0], f"/api/garden/jobs/{job_id}"),
                     headers={"X-ZQM_AI-ID": settings.zqm_ai_id},
                 )
                 resp.raise_for_status()
@@ -193,9 +345,12 @@ class GardenService:
             return {"job_id": job_id, "status": "unknown", "error": str(exc)}
 
     async def get_node_metrics(self) -> List[Dict[str, Any]]:
-        """Fetch resource metrics from all Garden nodes."""
+        """Fetch resource metrics from all Garden nodes with resilience."""
+        nodes = getattr(self, "GARDEN_NODES", [])
+        if not nodes:
+            return []
         results = await asyncio.gather(
-            *[self._get_node_metrics(node) for node in self.GARDEN_NODES],
+            *[self._get_node_metrics(node) for node in nodes],
             return_exceptions=True,
         )
         return [r for r in results if isinstance(r, dict)]
@@ -203,11 +358,26 @@ class GardenService:
     async def _get_node_metrics(self, node: Dict[str, Any]) -> Dict[str, Any]:
         try:
             async with httpx.AsyncClient(timeout=5) as client:
-                resp = await client.get(f"http://{node['ip']}:8808/api/garden/metrics")
+                resp = await client.get(
+                    self._endpoint(node, "/api/garden/metrics"),
+                    headers={"X-ZQM_AI-ID": settings.zqm_ai_id},
+                )
                 if resp.status_code == 200:
-                    data = resp.json()
+                    try:
+                        data = resp.json()
+                    except Exception:
+                        data = {"raw": resp.text[:200]}
                     data["node_id"] = node["id"]
+                    data["http_status"] = resp.status_code
                     return data
-        except Exception:
-            pass
-        return {"node_id": node["id"], "status": "offline"}
+                return {
+                    "node_id": node["id"],
+                    "status": "degraded",
+                    "http_status": resp.status_code,
+                }
+        except Exception as exc:
+            return {
+                "node_id": node["id"],
+                "status": "offline",
+                "error": str(exc)[:200],
+            }

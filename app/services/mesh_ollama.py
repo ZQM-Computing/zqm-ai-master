@@ -26,16 +26,16 @@ log = get_logger("mesh_ollama")
 # Default mesh topology: LOCAL first, then N4-local, N3, N1, N2.
 DEFAULT_BACKENDS: List[Dict[str, Any]] = [
     {"name": "N3", "url": "http://192.168.1.78:11434", "local": False},
-    {"name": "N1", "url": "http://192.168.1.53:11434", "local": False},
-    {"name": "N2", "url": "http://192.168.1.37:11434", "local": False},
-    {"name": "N4", "url": "http://192.168.1.219:11434", "local": False},
+    {"name": "N1", "url": "http://192.168.1.224:11434", "local": False},
+    {"name": "N2", "url": "http://192.168.1.31:11434", "local": False},
+    {"name": "N4", "url": "http://192.168.1.228:11434", "local": False},
 ]
 
 _CIRCUIT_TRIP = 3
 _DOWN_GRACE_S = 90.0
 # Health-check timeouts.
 _TAGS_TIMEOUT = 6.0
-_PROBE_TIMEOUT = 18.0
+_PROBE_TIMEOUT = 8.0
 _PROBE_NUM_PREDICT = 8
 _PROBE_FULL_AFTER_FAILURES = 2
 # Use chat/generate probe rewrite only when first backend probe is empty/500.

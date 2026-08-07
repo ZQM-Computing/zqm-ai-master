@@ -1,0 +1,26 @@
+{
+  "mmlu": {
+    "benchmark": "mmlu_probe",
+    "model": "qwen2.5:3b",
+    "score": 1.0,
+    "avg_latency_s": 2.962076425552368
+  },
+  "gsm8k": {
+    "benchmark": "gsm8k_probe",
+    "model": "qwen2.5:3b",
+    "score": 1.0,
+    "avg_latency_s": 7.8130786418914795
+  },
+  "humaneval": {
+    "benchmark": "humaneval_probe",
+    "model": "qwen2.5:3b",
+    "score": 1.0,
+    "avg_latency_s": 5.308794736862183
+  },
+  "truthfulqa": {
+    "benchmark": "truthfulqa_probe",
+    "model": "qwen2.5:3b",
+    "score": 1.0,
+    "avg_latency_s": 5.587036848068237
+  }
+}

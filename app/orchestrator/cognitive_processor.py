@@ -23,6 +23,8 @@ from typing import Any, Dict, List, Optional, Tuple
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from app.services.cost_tracker import estimate_cost
+
 from app.core.config import settings
 from app.core.logger import get_logger
 from app.memory.void_cache import get_void_cache
@@ -118,7 +120,15 @@ class CognitiveProcessor:
             output_type="text",
             model_used=agent.model,
             provider_used=agent.provider,
+            tokens_input=trace.total_tokens,
             tokens_output=execution.tokens_used,
+            total_tokens=(trace.total_tokens or 0) + (execution.tokens_used or 0),
+            cost_usd=estimate_cost(
+                model=agent.model,
+                provider=agent.provider,
+                tokens_input=trace.total_tokens,
+                tokens_output=execution.tokens_used,
+            ),
             reconstruction_variance=getattr(execution, "reconstruction_variance", None),
             reasoning_step_count=getattr(execution, "reasoning_step_count", None),
             reasoning_step_density=getattr(execution, "reasoning_step_density", None),
@@ -207,6 +217,12 @@ class CognitiveProcessor:
             model_used=primary_agent.model if primary_agent else None,
             provider_used=primary_agent.provider if primary_agent else None,
             total_tokens=total_tokens,
+            cost_usd=estimate_cost(
+                model=primary_agent.model if primary_agent else None,
+                provider=primary_agent.provider if primary_agent else None,
+                tokens_input=0,
+                tokens_output=total_tokens,
+            ),
             diversity_ratio=round(diversity_ratio, 4),
             reconstruction_variance=round(sum(v for v in [getattr(e, "reconstruction_variance", None) for e in executions if getattr(e, "reconstruction_variance", None) is not None]) / max(1, sum(1 for e in executions if getattr(e, "reconstruction_variance", None) is not None)), 6) if any(getattr(e, "reconstruction_variance", None) is not None for e in executions) else None,
             reasoning_step_count=sum(getattr(e, "reasoning_step_count", 0) or 0 for e in executions) or None,
@@ -237,6 +253,7 @@ class CognitiveProcessor:
                 task_id=request.task_id,
                 output=cached,
                 output_type="text",
+                cost_usd=0.0,
                 metadata={"cache_hit": True},
             )
 
@@ -410,7 +427,7 @@ class CognitiveProcessor:
             if base_caps or _system_tools_for_text(request.input):
                 # Agent has real system reach — run with tool execution,
                 # optionally gated by an explicit input schema.
-                output, tool_trace, truncation_note = await run_agent_with_tools(
+                output, tool_trace, truncation_note, total_usage = await run_agent_with_tools(
                     agent=agent,
                     request_input=request.input,
                     context=request.context,
@@ -425,15 +442,16 @@ class CognitiveProcessor:
                 # lightweight reconstruction-runtime probe:
                 # populate step hashes and simple reconstruction_/reasoning metrics.
                 self._populate_reconstruction_metrics(execution, output or "", tool_trace)
+                execution.tokens_used = total_usage.get("total_tokens") or len((output or "").split()) * 2
             else:
-                output = await self._call_ai_provider(agent, request)
+                output, token_usage = await self._call_ai_provider(agent, request)
                 # Ensure reconstruction metrics are populated even without tool execution.
                 self._populate_reconstruction_metrics(execution, output or "", [])
+                execution.tokens_used = token_usage.get("total_tokens") or len((output or "").split()) * 2
 
             execution.completed_at = datetime.now(timezone.utc)
             execution.duration_ms = int((time.monotonic() - t0) * 1000)
             execution.output = output
-            execution.tokens_used = len(output.split()) * 2  # rough estimate
 
             await registry.mark_idle(
                 agent.agent_id,
@@ -460,7 +478,9 @@ class CognitiveProcessor:
         messages: List[Dict[str, str]],
         params: Optional[Dict[str, Any]] = None,
         model: Optional[str] = None,
-    ) -> str:
+    ) -> Tuple[str, Dict[str, int]]:
+        """Call the model provider. Returns (generated_text, token_usage)."""
+        token_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
         provider = agent.provider
         resolved_model = model or agent.model
 
@@ -475,27 +495,28 @@ class CognitiveProcessor:
 
         async with httpx.AsyncClient(timeout=settings.task_timeout_seconds) as client:
             if provider == "ollama":
-                return await self._call_ollama(client, resolved_model, messages, params)
+                text = await self._call_ollama(client, resolved_model, messages, params, token_usage)
             elif provider == "openai":
-                return await self._call_openai(client, resolved_model, messages, params)
+                text = await self._call_openai(client, resolved_model, messages, params, token_usage)
             elif provider == "anthropic":
-                return await self._call_anthropic(client, resolved_model, messages, params)
+                text = await self._call_anthropic(client, resolved_model, messages, params, token_usage)
+            elif provider == "local_deterministic":
+                text = await self._call_local_deterministic(agent, messages, params, token_usage)
             else:
                 raise ValueError(f"Unknown AI provider: {provider}")
+            return text, token_usage
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=10))
-    async def _call_ai_provider(self, agent: Agent, request: TaskRequest) -> str:
+    async def _call_ai_provider(self, agent: Agent, request: TaskRequest) -> Tuple[str, Dict[str, int]]:
         """
         Call the configured AI provider for this agent.
         Supports: Ollama (local), OpenAI, Anthropic.
         """
+        token_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
         provider = agent.provider
         resolved_model = request.model or agent.model
 
         # ── Self-hosted mandate ──────────────────────────────────────────────
-        # The Void runs on local Ollama by default. External providers
-        # (OpenAI / Anthropic) are opt-in ONLY, gated behind
-        # ZQM_ALLOW_EXTERNAL_PROVIDERS=true. Block silently-phone-home.
         if provider in ("openai", "anthropic") and not settings.allow_external_providers:
             raise RuntimeError(
                 f"External AI provider '{provider}' is blocked: The Void is "
@@ -507,11 +528,10 @@ class CognitiveProcessor:
         if agent.system_prompt:
             messages.append({"role": "system", "content": agent.system_prompt})
 
-        # Add session context if provided
         if request.context and request.context.get("session_history"):
             messages.append({
                 "role": "system",
-                "content": f"Previous conversation:\n{request.context['session_history']}",
+                "content": f"Previous conversation:\\n{request.context['session_history']}",
             })
 
         messages.append({"role": "user", "content": request.input})
@@ -523,15 +543,16 @@ class CognitiveProcessor:
 
         async with httpx.AsyncClient(timeout=settings.task_timeout_seconds) as client:
             if provider == "ollama":
-                return await self._call_ollama(client, resolved_model, messages, params)
+                text = await self._call_ollama(client, resolved_model, messages, params, token_usage)
             elif provider == "openai":
-                return await self._call_openai(client, resolved_model, messages, params)
+                text = await self._call_openai(client, resolved_model, messages, params, token_usage)
             elif provider == "anthropic":
-                return await self._call_anthropic(client, resolved_model, messages, params)
+                text = await self._call_anthropic(client, resolved_model, messages, params, token_usage)
             elif provider == "local_deterministic":
-                return await self._call_local_deterministic(agent, messages, params)
+                text = await self._call_local_deterministic(agent, messages, params, token_usage)
             else:
                 raise ValueError(f"Unknown AI provider: {provider}")
+            return text, token_usage
 
     async def _call_ollama(
         self,
@@ -539,6 +560,7 @@ class CognitiveProcessor:
         model: str,
         messages: List[Dict],
         params: Dict,
+        token_usage: Dict[str, int],
     ) -> str:
         # Federation: route across the ZQM-MESH Ollama pool (N1/N2/N3/N4),
         # selecting the node that actually has `model`, with failover.
@@ -575,6 +597,23 @@ class CognitiveProcessor:
                 "Ollama mesh fallback failed", model=fallback_model, error=str(exc)
             )
             raise
+        prompt_tokens = 0
+        completion_tokens = 0
+        if isinstance(data, dict):
+            prompt_tokens = int(data.get("prompt_eval_count") or data.get("prompt_tokens") or 0)
+            completion_tokens = int(
+                max(
+                    data.get("eval_count") or 0,
+                    data.get("completion_tokens") or 0,
+                )
+            )
+        token_usage.update(
+            {
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": prompt_tokens + completion_tokens,
+            }
+        )
         return data.get("message", {}).get("content", "")
 
     async def _call_openai(
@@ -583,6 +622,7 @@ class CognitiveProcessor:
         model: str,
         messages: List[Dict],
         params: Dict,
+        token_usage: Dict[str, int],
     ) -> str:
         response = await client.post(
             "https://api.openai.com/v1/chat/completions",
@@ -596,6 +636,14 @@ class CognitiveProcessor:
         )
         response.raise_for_status()
         data = response.json()
+        usage = data.get("usage") or {}
+        token_usage.update(
+            {
+                "prompt_tokens": int(usage.get("prompt_tokens") or 0),
+                "completion_tokens": int(usage.get("completion_tokens") or 0),
+                "total_tokens": int(usage.get("total_tokens") or 0),
+            }
+        )
         return data["choices"][0]["message"]["content"]
 
     async def _call_local_deterministic(
@@ -603,6 +651,7 @@ class CognitiveProcessor:
         agent: Agent,
         messages: List[Dict[str, str]],
         params: Dict[str, Any],
+        token_usage: Dict[str, int],
     ) -> str:
         """Deterministic fallback when no LLM backend is available."""
         system_prompt = agent.system_prompt or agent.name or "ZQM Agent"
@@ -639,6 +688,7 @@ class CognitiveProcessor:
         model: str,
         messages: List[Dict],
         params: Dict,
+        token_usage: Dict[str, int],
     ) -> str:
         # Anthropic uses separate system / messages format
         system_msg = ""
@@ -667,6 +717,14 @@ class CognitiveProcessor:
         )
         response.raise_for_status()
         data = response.json()
+        usage = data.get("usage") or {}
+        token_usage.update(
+            {
+                "prompt_tokens": int(usage.get("input_tokens") or usage.get("prompt_tokens") or 0),
+                "completion_tokens": int(usage.get("output_tokens") or usage.get("completion_tokens") or 0),
+                "total_tokens": int(usage.get("input_tokens") or 0) + int(usage.get("output_tokens") or 0),
+            }
+        )
         return data["content"][0]["text"]
 
     # ── Synthesis & evaluation ────────────────────────────────────────────────

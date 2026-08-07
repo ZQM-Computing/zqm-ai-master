@@ -75,7 +75,7 @@ class TaskRequest(BaseModel):
         description="Additional context, metadata, or parameters",
     )
     cognitive_level: CognitiveLevel = Field(
-        default=CognitiveLevel.ADVANCED,
+        default=CognitiveLevel.AUTONOMOUS,
         description="Processing depth level",
     )
     priority: TaskPriority = Field(
@@ -214,6 +214,7 @@ class Task(BaseModel):
     cognitive_trace: Optional[CognitiveTrace] = None
     error: Optional[str] = None
     retry_count: int = 0
+    falsification_report: Optional[Dict[str, Any]] = Field(default=None, description="Falsification protocol audit result for this task")
 
 
 class TaskResult(BaseModel):

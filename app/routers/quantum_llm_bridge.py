@@ -41,10 +41,10 @@ log = get_logger("router.quantum")
 
 # Default quantum compute nodes (N1-N4). zqmlocal on each.
 _DEFAULT_NODES = [
-    "zqmlocal@192.168.1.218",  # N1
-    "zqmlocal@192.168.1.196",  # N2
+    "zqmlocal@192.168.1.224",  # N1
+    "zqmlocal@192.168.1.31",   # N2
     "zqmlocal@192.168.1.78",   # N3
-    "zqmlocal@192.168.1.219",  # N4
+    "zqmlocal@192.168.1.228",  # N4
 ]
 
 _DRIVER = r'''
@@ -175,38 +175,94 @@ def _run_ssh(target: str, mode: str, payload: Optional[str], timeout: int) -> Di
             continue
         try:
             py = _detect_remote_python(c)
-            sftp = c.open_sftp()
+            remote_py = r"C:\Temp\qlm_drv.py"
+            payload_path = r"C:\Temp\qlm_payload.json"
+            sftp_ok = True
             try:
-                sftp.stat("/Temp")
-            except IOError:
-                c.exec_command("cmd /c mkdir C:\\Temp")
-            with sftp.open("/Temp/qlm_drv.py", "w") as f:
-                f.write(_DRIVER)
-            sftp.close()
-            cmd = f"cmd /c {py} C:\\Temp\\qlm_drv.py {mode}"
+                sftp = c.open_sftp()
+                try:
+                    sftp.stat("/Temp")
+                except IOError:
+                    c.exec_command("cmd /c mkdir C:\\Temp")
+                with sftp.open(remote_py, "w") as f:
+                    f.write(_DRIVER)
+                if payload is not None:
+                    with sftp.open(payload_path, "w") as f:
+                        f.write(payload)
+                sftp.close()
+            except Exception:
+                sftp_ok = False
+            if not sftp_ok:
+                remote_py = r"C:\Temp\qlm_drv.py"
+                payload_path = r"C:\Temp\qlm_payload.json"
+                drv_b64 = __import__("base64").b64encode(_DRIVER.encode()).decode()
+                payload_b64 = (
+                    __import__("base64").b64encode((payload or "").encode()).decode()
+                    if payload is not None
+                    else ""
+                )
+                remote_write = (
+                    "import base64,sys;"
+                    "open(sys.argv[1],'wb').write(base64.b64decode(sys.argv[2]));"
+                    "open(sys.argv[3],'wb').write(base64.b64decode(sys.argv[4])) if sys.argv[4] else None"
+                )
+                try:
+                    _, o, e = c.exec_command(
+                        f"cmd /c {py} -c \"{remote_write}\" \"{remote_py}\" \"{drv_b64}\" \"{payload_path}\" \"{payload_b64}\"",
+                        timeout=timeout,
+                    )
+                    try:
+                        o.read()
+                    except Exception:
+                        pass
+                except Exception as ex:
+                    return {
+                        "status": "error",
+                        "error": f"remote write failed: {type(ex).__name__}: {ex}"[:200],
+                        "node": target,
+                        "sftp": False,
+                    }
+            cmd = f"cmd /c {py} {remote_py} {mode}"
             if payload is not None:
-                sftp2 = c.open_sftp()
-                with sftp2.open("/Temp/qlm_payload.json", "w") as f:
-                    f.write(payload)
-                sftp2.close()
-                cmd = f"cmd /c {py} C:\\Temp\\qlm_drv.py {mode} C:\\Temp\\qlm_payload.json"
-            _, o, e = c.exec_command(cmd, timeout=timeout)
+                cmd = f"cmd /c {py} {remote_py} {mode} {payload_path}"
             try:
-                out = o.read().decode(errors="replace").strip()
-                err = e.read().decode(errors="replace").strip()
-            except BaseException as ex:
-                last = {"status": "error", "error": f"ssh cmd read failed: {type(ex).__name__}: {ex}"[:200], "node": target}
-                c.close()
+                _, o, e = c.exec_command(cmd, timeout=timeout)
+                try:
+                    out = o.read().decode(errors="replace").strip()
+                    err = e.read().decode(errors="replace").strip()
+                except BaseException as ex:
+                    last = {
+                        "status": "error",
+                        "error": f"ssh cmd read failed: {type(ex).__name__}: {ex}"[:200],
+                        "node": target,
+                    }
+                    c.close()
+                    continue
+            except Exception as ex:
+                last = {
+                    "status": "error",
+                    "error": f"ssh exec failed: {type(ex).__name__}: {ex}"[:200],
+                    "node": target,
+                    "sftp": bool(not sftp_ok),
+                }
+                try:
+                    c.close()
+                except Exception:
+                    pass
                 continue
             c.close()
             if not out and err:
-                return {"status": "error", "error": err[:300], "node": target}
+                return {"status": "error", "error": err[:300], "node": target, "sftp": bool(not sftp_ok)}
             try:
                 return json.loads(out)
             except json.JSONDecodeError:
-                return {"status": "error", "raw": out[:400], "stderr": err[:200], "node": target}
-        except (paramiko.SSHException, EOFError, TimeoutError) as ex:
-            last = {"status": "error", "error": f"ssh transport error (retry {attempt+1}): {ex}"[:200], "node": target}
+                return {"status": "error", "raw": out[:400], "stderr": err[:200], "node": target, "sftp": bool(not sftp_ok)}
+        except Exception as ex:
+            last = {
+                "status": "error",
+                "error": f"ssh transport error (retry {attempt+1}): {type(ex).__name__}: {ex}"[:200],
+                "node": target,
+            }
             continue
         finally:
             try:
@@ -283,9 +339,24 @@ async def nodes(request: Request,
     local = _local_python()
     if local:
         return {"nodes": [{"node": "local", **_run_on("local", "verify", None, 60)}]}
-    out = []
-    for node in _nodes():
-        out.append({"node": node, **_run_on(node, "verify", None, 60)})
+    node_list = _nodes()
+    if not node_list:
+        return {"nodes": [], "healthy_count": 0, "healthy": []}
+    try:
+        import asyncio
+        results = await asyncio.gather(
+            *[asyncio.to_thread(_run_on, node, "verify", None, 60) for node in node_list],
+            return_exceptions=True,
+        )
+        out = []
+        for node, result in zip(node_list, results):
+            if isinstance(result, Exception):
+                out.append({"node": node, "status": "error", "error": f"{type(result).__name__}: {result}"[:200]})
+            else:
+                out.append({"node": node, **result})
+    except Exception as exc:
+        return {"nodes": [{"node": node, "status": "error", "error": str(exc)[:120]} for node in node_list],
+                "healthy_count": 0, "healthy": []}
     healthy = [n["node"] for n in out if n.get("status") == "ok"]
     return {"nodes": out, "healthy_count": len(healthy), "healthy": healthy}
 

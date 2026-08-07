@@ -78,8 +78,8 @@ KNOWN_PATCHES: List[Dict[str, str]] = [
     {
         "id": "env-version-healthstatus",
         "file": "app/models/response.py",
-        "old": '    zqm_ai_id: str = "ZQM-ZQM_AI-001"\n    version: str = "2.0.0"\n',
-        "new": '    zqm_ai_id: str = "ZQM-ZQM_AI-001"\n    version: str = _VOID_VERSION\n',
+        "old": '    zqm_ai_id: str = "ZQM-ZQM_AI-004"\n    version: str = "2.0.0"\n',
+        "new": '    zqm_ai_id: str = "ZQM-ZQM_AI-004"\n    version: str = _VOID_VERSION\n',
         "why": "HealthStatus envelope version was hardcoded 2.0.0; now tracks the real build version.",
     },
     {

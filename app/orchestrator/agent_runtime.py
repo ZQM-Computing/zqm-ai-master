@@ -596,8 +596,9 @@ async def run_agent_with_tools(
         })
     messages.append({"role": "user", "content": request_input})
 
-    raw = await call_model(agent=agent, messages=messages)
+    raw, _first_usage = await call_model(agent=agent, messages=messages)
     current = raw
+    total_usage = dict(_first_usage)
 
     for _ in range(max_tool_rounds):
         parsed = parse_action(current)
@@ -609,7 +610,8 @@ async def run_agent_with_tools(
             # let the model know and re-prompt once
             messages.append({"role": "assistant", "content": current})
             messages.append({"role": "user", "content": f"Tool '{name}' is not available. Answer without it."})
-            current = await call_model(agent=agent, messages=messages)
+            current, usage = await call_model(agent=agent, messages=messages)
+            _merge_usage(total_usage, usage)
             continue
 
         try:
@@ -638,11 +640,18 @@ async def run_agent_with_tools(
             "role": "user",
             "content": f"TOOL RESULT ({name}): {result_str}\n\nNow answer the original request using this result.",
         })
-        current = await call_model(agent=agent, messages=messages)
+        current, usage = await call_model(agent=agent, messages=messages)
+        _merge_usage(total_usage, usage)
         if truncation_note:
-            return current, tool_trace, truncation_note
+            return current, tool_trace, truncation_note, total_usage
 
-    return current, tool_trace, None
+    return current, tool_trace, None, total_usage
+
+
+def _merge_usage(target: Dict[str, int], source: Dict[str, int]) -> None:
+    """Merge token usage dicts in-place."""
+    for key, value in source.items():
+        target[key] = int(target.get(key, 0) or 0) + int(value or 0)
 
 
 def _validate_tool_args(tool_name: str, args: Dict[str, Any], schema: Dict[str, Any]) -> Tuple[bool, str]:

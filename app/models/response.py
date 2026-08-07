@@ -11,6 +11,11 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Generic, List, Optional, TypeVar
 
 from pydantic import BaseModel, Field
+from app.core.version import __version__ as _VOID_VERSION
+from app.core.version import __version__ as _VOID_VERSION
+from app.core.version import __version__ as _VOID_VERSION
+from app.core.version import __version__ as _VOID_VERSION
+from app.core.version import __version__ as _VOID_VERSION
 
 from app.core.version import __version__ as _VOID_VERSION
 
@@ -28,7 +33,7 @@ class ZQM_AIResponse(BaseModel, Generic[T]):
     success: bool = True
     data: Optional[T] = None
     message: Optional[str] = None
-    zqm_ai_id: str = "ZQM-ZQM_AI-001"
+    zqm_ai_id: str = "ZQM-ZQM_AI-004"
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     request_id: Optional[str] = None
     duration_ms: Optional[int] = None
@@ -81,7 +86,7 @@ class ErrorResponse(BaseModel):
     error: str
     detail: Optional[str] = None
     errors: List[ErrorDetail] = Field(default_factory=list)
-    zqm_ai_id: str = "ZQM-ZQM_AI-001"
+    zqm_ai_id: str = "ZQM-ZQM_AI-004"
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     request_id: Optional[str] = None
 
@@ -95,7 +100,7 @@ class PaginatedResponse(BaseModel, Generic[T]):
     page: int = 1
     page_size: int = 20
     pages: int = 1
-    zqm_ai_id: str = "ZQM-ZQM_AI-001"
+    zqm_ai_id: str = "ZQM-ZQM_AI-004"
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     @classmethod
@@ -126,7 +131,7 @@ class HealthStatus(BaseModel):
     """
 
     status: str = "healthy"           # healthy | degraded | unhealthy (CORE only)
-    zqm_ai_id: str = "ZQM-ZQM_AI-001"
+    zqm_ai_id: str = "ZQM-ZQM_AI-004"
     version: str = _VOID_VERSION
     environment: str = "development"
     uptime_seconds: Optional[float] = None

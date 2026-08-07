@@ -34,11 +34,70 @@ from app.orchestrator.cognitive_processor import CognitiveProcessor
 from app.orchestrator.task_router import TaskRouter
 from app.services.garden_service import GardenService
 from app.services.flatspace_service import FlatSpaceService
+from app.services.synology_service import SynologyService
+from app.services.mesh_node_ops import MeshNodeOperations
 from app.orchestrator import self_apply
 from app.orchestrator import system_integration
+from app.orchestrator import void_council
 from app.services.observability_service import ObservabilityService
+from app.services.falsification_protocol import FalsificationProtocol
 
 log = get_logger("zqm_ai-orchestrator")
+
+
+def _task_app_state(task: Optional["Task"], cognitive_trace: Any) -> Dict[str, Any]:
+    """Build app_state dict for falsification protocol from task + trace."""
+    if task is None:
+        task = type("Task", (), {"task_id": "unknown", "status": "unknown", "cognitive_level": "unknown"})()
+    wm: List[str] = []
+    kv_cache: List[float] = []
+    error_curve: List[float] = []
+    tool_output: Dict[str, Any] = {}
+    seed = 42
+    constraints = ["max_length=100", "no_code_switch", "preserve_tense"]
+
+    if cognitive_trace is not None:
+        for exec_rec in getattr(cognitive_trace, "executions", []):
+            step_text = (getattr(exec_rec, "output", None) or "").strip()
+            if step_text:
+                wm.append(step_text[:120])
+            tool_trace = getattr(exec_rec, "tool_trace", None)
+            if tool_trace:
+                for action in tool_trace:
+                    if action.get("ok"):
+                        tool_output = action.get("result", tool_output)
+                        break
+            step_hashes = getattr(exec_rec, "step_hashes", None)
+            if step_hashes:
+                try:
+                    kv_cache.extend([int(h, 16) / 0xFFFFFFFF for h in step_hashes[-20:]])
+                except Exception:
+                    pass
+        reconstruction_variance = getattr(cognitive_trace, "reconstruction_variance", None)
+        if reconstruction_variance is not None:
+            error_curve = [float(reconstruction_variance)] * 20
+
+    return {
+        "envelope": {
+            "task_id": task.task_id if hasattr(task, "task_id") else "unknown",
+            "status": task.status.value if hasattr(task.status, "value") else str(getattr(task, "status", "unknown")),
+            "cognitive_level": task.cognitive_level.value if hasattr(task.cognitive_level, "value") else str(getattr(task, "cognitive_level", "unknown")),
+        },
+        "working_memory": wm[:10],
+        "kv_cache": kv_cache[:100],
+        "cumulative_error": float(error_curve[-1]) if error_curve else 0.0,
+        "last_tool_output": tool_output,
+        "error_curve": error_curve,
+        "seed": seed,
+        "constraints": constraints,
+        "world_snapshot": getattr(task, "world_snapshot", None) or {},
+        "world_baseline": getattr(task, "world_baseline", None) or {},
+        "world_staleness_s": float(getattr(task, "world_staleness_s", 0.0) or 0.0),
+        "world_staleness_threshold_s": float(getattr(task, "world_staleness_threshold_s", 600.0) or 600.0),
+        "last_observation": getattr(task, "last_observation", None) or {},
+        "last_action": getattr(task, "last_action", None) or {},
+        "action_world_delta": getattr(task, "action_world_delta", None) or {},
+    }
 
 
 class ZQM_AIOrchestrator:
@@ -64,7 +123,9 @@ class ZQM_AIOrchestrator:
         self.cache = get_void_cache()
         self.garden = GardenService()
         self.flatspace = FlatSpaceService()
+        self.node_ops = MeshNodeOperations(garden=self.garden)
         self.observability = ObservabilityService()
+        self.falsification = FalsificationProtocol()
         # Allow observability to read co-task pair topology from registry.
         self.observability._registry = self.registry
 
@@ -78,7 +139,11 @@ class ZQM_AIOrchestrator:
         self._total_tokens: int = 0
         self._lock = asyncio.Lock()
         self._self_improve_task: Optional[asyncio.Task] = None
-
+        self._council_task: Optional[asyncio.Task] = None
+        self._void_council = void_council.VoidCouncil(
+            registry=self.registry,
+            settings=settings,
+        )
         log.info(
             "ZQM_AIOrchestrator created",
             zqm_ai_id=self.ZQM_AI_ID,
@@ -104,6 +169,22 @@ class ZQM_AIOrchestrator:
 
         # Constant self-improvement loop (convenes panel via live backend)
         self._self_improve_task = asyncio.create_task(self._self_improvement_loop())
+
+        # Council integrations
+        try:
+            await self._void_council.initialize_integrations(
+                observability=self.observability,
+                flatspace=self.flatspace,
+                garden=self.garden,
+                redis=getattr(app.state, "redis", None),
+            )
+        except Exception as exc:
+            log.debug("council integrations init skipped", error=str(exc))
+
+        # Optional scheduled council loop
+        council_interval = getattr(settings, "council_interval_minutes", 0)
+        if council_interval and council_interval > 0:
+            self._council_task = asyncio.create_task(self._council_loop(council_interval))
 
         log.info(
             "ZQM_AIOrchestrator online",
@@ -250,6 +331,16 @@ class ZQM_AIOrchestrator:
             task.result = result
             task.cognitive_trace = cognitive_trace
 
+            # 5a. Run falsification protocol audit on task state
+            try:
+                falsification_report = self.falsification.full_audit(
+                    app_state=_task_app_state(task, cognitive_trace)
+                )
+                task.falsification_report = falsification_report
+            except Exception as exc:
+                log.warning("Falsification audit failed", task_id=task.task_id, error=str(exc))
+                task.falsification_report = {"error": str(exc)}
+
             # 5b. Surface agent tool/integration actions in the response
             #     (so callers can see which systems the agents reached).
             agent_actions: List[Dict[str, Any]] = []
@@ -369,22 +460,21 @@ class ZQM_AIOrchestrator:
 
     # ── Status & Dashboard ────────────────────────────────────────────────────
 
-    async def get_health(self) -> HealthStatus:
+    async def get_health(self, request: Request) -> HealthStatus:
         """Return system health check."""
-        import psutil
         import os
 
+        mem = None
+        cpu = None
         try:
             import psutil
-            mem = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
-            cpu = psutil.cpu_percent(interval=0.1)
+            try:
+                mem = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
+                cpu = psutil.cpu_percent(interval=None) or psutil.cpu_percent(interval=0.1)
+            except Exception:
+                pass
         except ImportError:
-            # psutil is an optional dependency; degrade gracefully if absent.
-            mem = None
-            cpu = None
-        except Exception:
-            mem = None
-            cpu = None
+            pass
 
         agent_stats = self.registry.stats()
         cache_stats = self.cache.stats()
@@ -407,14 +497,44 @@ class ZQM_AIOrchestrator:
         except (asyncio.TimeoutError, Exception):
             garden_ok, flatspace_ok, obs_ok = False, False, False
 
-        # CORE health = The Void's own datastore + memory + agent pool + autonomy.
-        # (flatspace_ok == the local SQLite backend that is The Void's database.)
         database_ok = flatspace_ok
         self_apply_on = self_apply.SELF_APPLY_ON
         core_ok = database_ok and agent_stats["total"] > 0
         status = "healthy" if core_ok else "degraded"
 
-        # EXTERNAL optional deps are reported separately and do NOT degrade core.
+        redis_state = getattr(request.app.state, "redis", None)
+        redis_status = "disabled"
+        if redis_state is not None:
+            try:
+                health = await redis_state.health_check()
+                redis_status = health.get("status", "disabled")
+            except Exception:
+                redis_status = "error"
+        else:
+            try:
+                from app.services.redis_service import RedisService
+                rs = RedisService()
+                health = await rs.health_check()
+                redis_status = health.get("status", "disabled")
+            except Exception:
+                redis_status = "disabled"
+
+        # Always cross-check with a fresh RedisService instance to avoid stale app.state.redis
+        fresh_redis_status = "disabled"
+        try:
+            from app.services.redis_service import RedisService
+            fresh = RedisService()
+            fresh_health = await fresh.health_check()
+            fresh_redis_status = fresh_health.get("status", "disabled")
+            with open("C:/Void/ZQM-AI-Master/debug_redis_status.txt", "a", encoding="utf-8") as f:
+                f.write(f"fresh_redis_status={fresh_redis_status} health={fresh_health}\n")
+            if fresh_redis_status == "ok":
+                redis_status = fresh_redis_status
+        except Exception as exc:
+            with open("C:/Void/ZQM-AI-Master/debug_redis_status.txt", "a", encoding="utf-8") as f:
+                f.write(f"fresh redis exception: {exc}\n")
+            pass
+
         external_services = {
             "garden": "healthy" if garden_ok else "unreachable",
             "observability": "healthy" if obs_ok else "unreachable",
@@ -427,7 +547,7 @@ class ZQM_AIOrchestrator:
             environment=os.getenv("ENVIRONMENT", settings.environment),
             uptime_seconds=round(uptime, 1),
             database="healthy" if database_ok else "unreachable",
-            redis="disabled",
+            redis=redis_status,
             garden="healthy" if garden_ok else "unreachable",
             flatspace="healthy" if flatspace_ok else "unreachable",
             observability="healthy" if obs_ok else "unreachable",
@@ -484,7 +604,6 @@ class ZQM_AIOrchestrator:
         return {
             "zqm_ai_id": self.ZQM_AI_ID,
             "employee_id": self.EMPLOYEE_ID,
-            "primary_garden": self.PRIMARY_GARDEN,
             "primary_garden": self.PRIMARY_GARDEN,
             "version": settings.app_version,
             "environment": settings.environment,
@@ -608,10 +727,11 @@ class ZQM_AIOrchestrator:
             AgentType.GARDEN, AgentType.LEARNING, AgentType.HYDROLOGY,
         ]
         idx = 0
+        last_findings_summary: List[str] = []
         while True:
             try:
                 await asyncio.sleep(interval)
-                await self._self_critique(cycle[idx % len(cycle)])
+                await self._self_critique(cycle[idx % len(cycle)], last_findings_summary)
                 idx += 1
             except asyncio.CancelledError:
                 log.info("Self-improvement loop cancelled")
@@ -620,7 +740,7 @@ class ZQM_AIOrchestrator:
                 log.warning("Self-improvement cycle failed (skipping)", error=str(exc))
                 await asyncio.sleep(30)
 
-    async def _self_critique(self, specialist: AgentType) -> None:
+    async def _self_critique(self, specialist: AgentType, last_findings_summary: List[str]) -> None:
         """
         One self-improvement cycle: convene Reasoning + a rotating specialist +
         Synthesis to critique The Void and propose ONE concrete, code-level
@@ -640,6 +760,18 @@ class ZQM_AIOrchestrator:
             f"[{t.cognitive_level}] {t.input[:100]} -> {t.status.value}"
             for t in recent
         ) or "(no tasks executed yet)"
+
+        # Suppress duplicate-finding loops: reuse the prior finding categories
+        # when no actionable patch was applied in the last cycle.
+        applied_recently = bool(last_findings_summary)
+        reuse_note = ""
+        if applied_recently:
+            reuse_note = (
+                "Prior cycle finding categories: "
+                + ", ".join(last_findings_summary[-5:])
+                + ". If these are still the highest-leverage issues, return a short confirmation instead of repeating them."
+            )
+
         topic = (
             "Self-improvement critique of The Void AI orchestrator. "
             f"Recent task history: {history_blob}. "
@@ -651,7 +783,8 @@ class ZQM_AIOrchestrator:
             "syntax or template placeholders. Never output sample text like "
             "<rel path under app/> or <exact old text>. Only emit structured "
             "EXPAND_AGENT / EXPAND_TOOL directives when you are certain the "
-            "agent type and capabilities are valid."
+            "agent type and capabilities are valid. "
+            + reuse_note
         )
 
         try:
@@ -754,6 +887,12 @@ class ZQM_AIOrchestrator:
                                                           if k in ("self_apply", "proposed", "applied")})
                 except Exception as exc:
                     log.warning("Self-replication scan failed", error=str(exc))
+
+                # Track concise finding categories to suppress duplicate loops.
+                if findings:
+                    last_findings_summary.append("; ".join(findings[-3:])[:180])
+                    if len(last_findings_summary) > 50:
+                        del last_findings_summary[: len(last_findings_summary) - 50]
         except Exception as exc:
             log.warning("Self-critique backend call failed", error=str(exc))
 

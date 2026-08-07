@@ -40,7 +40,7 @@ log = get_logger("self-replicate")
 SELF_APPLY_ON = os.getenv("ZQM_SELF_APPLY", "false").lower() in ("1", "true", "yes")
 
 # Known mesh nodes (canonical — mirrors zqm_tools_cli NODES). Never arbitrary IPs.
-KNOWN_NODES = {"N1": "192.168.1.218", "N2": "192.168.1.196", "N3": "192.168.1.78", "N4": "192.168.1.219"}
+KNOWN_NODES = {"N1": "192.168.1.224", "N2": "192.168.1.31", "N3": "192.168.1.78", "N4": "192.168.1.228"}
 # Where the replica lives on the target (Windows path).
 REPLICA_PATH = r"C:\Void\ZQM-AI-Master"
 # Source repo to clone (this host's repo, served via git or file copy).
@@ -149,9 +149,9 @@ async def replicate_to(orchestrator: Any, node: str, confirm: bool = False) -> D
     # Identity is SHARED: the replica gets the same SECRET_KEY (operator decision).
     # NOTE: Windows/MSYS git treats \v \t as escapes -> ALL git/clone paths use
     # FORWARD slashes. cmd.exe `cd` and sched-task /TR need BACKslashes.
-    src_repo = REPO_CLONE_URL or os.getenv("ZQM_VOID_SRC",
-        r"C:/Users/zqmco/OneDrive/Imports/zqmcomputing@gmail.com - Google Drive"
-        r"/ZQM Computing/05_Quantum_Computing/Software/ZQM-AI-Master")
+    src_repo = REPO_CLONE_URL or os.getenv("ZQM_VOID_SRC", None)
+    if not src_repo:
+        raise RuntimeError("ZQM_VOID_SRC/REPO_CLONE_URL not set; cannot bundle replica without source repo path")
     bundle = r"C:/temp/void_work/void_replica.bundle"
     try:
         import subprocess

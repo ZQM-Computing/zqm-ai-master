@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Void — Diagram of Operations (Full)</title>
+  <style>
+    html, body { margin:0; padding:0; background:#020617; color:#e2e8f0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 24px; }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    .sub { color:#94a3b8; font-size: 12px; margin-bottom: 16px; }
+    .layer { border:1px solid #1e293b; border-radius:12px; padding:14px; margin-bottom:14px; background:#0b1220; }
+    .layer h2 { font-size:14px; margin:0 0 10px; color:#fbbf24; display:flex; justify-content:space-between; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:10px; }
+    .card { background:#0f172a; border:1px solid #1f2937; border-radius:10px; padding:10px; }
+    .card h3 { font-size:12px; margin:0 0 6px; color:#38bdf8; }
+    .card p { font-size:11px; color:#cbd5e1; margin:0; line-height:1.45; }
+    .tag { display:inline-block; font-size:10px; padding:2px 6px; border-radius:999px; background:#10b98133; color:#6ee7b7; margin-top:6px; }
+    .tag.warn { background:#f59e0b33; color:#fcd34d; }
+    .tag.err { background:#ef444433; color:#fca5a5; }
+    .conn { color:#94a3b8; font-size:11px; margin-top:8px; }
+    .legend { display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; }
+    .legend span { font-size:10px; color:#94a3b8; }
+    code { background:#111827; padding:1px 4px; border-radius:4px; color:#e2e8f0; }
+  </style>
+  </head>
+<body>
+  <div class="wrap">
+    <h1>The Void — Diagram of Operations (Full)</h1>
+    <div class="sub">Verified live 2026-08-04 · version 2.1.4 · 23/23 containers · N1/N3/N4 operational · 93 routes · Falsification protocol 8/8 · PID 37872 system Python, not venv</div>
+
+    <div class="layer">
+      <h2><span>L0 — Clients / Ingress</span><span class="tag">9 surfaces</span></h2>
+      <div class="grid">
+        <div class="card"><h3>Web UI</h3><p>Traefik → <code>webui.zqmlabs.com</code> → open-webui :8080 with SSO strip-cors + cors middleware.</p><span class="tag">HTTP 200</span></div>
+        <div class="card"><h3>n8n UI</h3><p>Workflow automation at <code>n8n.zqmlabs.com</code> :5678, restricted ACAO, authentik outpost.</p><span class="tag">HTTP 200</span></div>
+        <div class="card"><h3>Open WebUI</h3><p>Ollama chat surface at <code>llm.zqmlabs.com</code> :3001, authentik gated.</p><span class="tag">HTTP 200</span></div>
+        <div class="card"><h3>Flowise</h3><p>Low-code LLM chain builder :3000, internal Docker networking.</p><span class="tag">healthy</span></div>
+        <div class="card"><h3>zqm-chat</h3><p>Chatbot UI :3000, Traefik host <code>chat.zqmlabs.com</code>.</p><span class="tag">HTTP 200</span></div>
+        <div class="card"><h3>zqm-home</h3><p>Homepage dashboard :3000, Docker + service API integrations.</p><span class="tag">HTTP 200</span></div>
+        <div class="card"><h3>zqm-status</h3><p>Uptime Kuma :3001, localhost-bound health monitor.</p><span class="tag">HTTP 200</span></div>
+        <div class="card"><h3>SearXNG</h3><p>Privacy metasearch at <code>search.zqmlabs.com</code> :8080.</p><span class="tag">HTTP 200</span></div>
+        <div class="card"><h3>API Callers</h3><p>Authenticated JWT callers hitting <code>/api/*</code> on N1/N3/N4 :8808.</p><span class="tag">strict 401</span></div>
+      </div>
+      <div class="conn">Connects to → L1 Edge: all client traffic enters via Traefik entrypoints web / websecure / webplain (:80/:443/:8089)</div>
+    </div>
+
+    <div class="layer">
+      <h2><span>L1 — Edge</span><span class="tag">Traefik + DNS + TLS</span></h2>
+      <div class="grid">
+        <div class="card"><h3>zqm-traefik</h3><p>Reverse proxy v3.1.2, ACME TLS, strip-cors + cors middleware, Host() rules for *.zqm + *.zqm.mesh + *.zqmlabs.com.</p><span class="tag">.228:80/.228:443/.228:8088</span></div>
+        <div class="card"><h3>zqm-coredns</h3><p>DNS :53 Docker-internal only, Corefile + zones mounted, forward to unbound DoT :853.</p><span class="tag">172.21.0.24:53</span></div>
+        <div class="card"><h3>zqm-dot</h3><p>Unbound validating recursive resolver on <code>.228:853</code>, cached, TLS.</p><span class="tag">.228:853</span></div>
+        <div class="card"><h3>TLS cert</h3><p><code>zqm-mesh.crt</code> 39 DNS SAN + IP .228, valid 2026–2036, imported to Windows Trusted Root.</p><span class="tag">Trusted</span></div>
+        <div class="card"><h3>Windows hosts</h3><p>57 entries: 54 → .228, 3 → .224 (n1.*). Backup <code>hosts.bak-20260804-092800</code>.</p><span class="tag">resolved</span></div>
+      </div>
+      <div class="conn">Connects to → L2 Backends: Traefik routes by Host() to backend containers; DNS resolution feeds hostnames for clients and mesh probes</div>
+    </div>
+
+    <div class="layer">
+      <h2><span>L2 — Backends</span><span class="tag">5 services</span></h2>
+      <div class="grid">
+        <div class="card"><h3>zqm-mesh-api</h3><p>Mesh control plane / API gateway on :8899. Exposes /api/process, /api/status, /api/info, /api/falsification, etc.</p><span class="tag">:8899 healthy</span></div>
+        <div class="card"><h3>zqm-quantum-api</h3><p>Quantum-LLM bridge endpoints /quantum/*, mesh health/verify/nodes/models sweep.</p><span class="tag">:8891 healthy</span></div>
+        <div class="card"><h3>one-api</h3><p>LLM API key management + redistribution on :3000, unified OpenAI-format gateway.</p><span class="tag">:3000 healthy</span></div>
+        <div class="card"><h3>zqm-litellm</h3><p>LiteLLM proxy on :4000, supports 100+ providers in OpenAI format.</p><span class="tag">:4000 healthy</span></div>
+        <div class="card"><h3>zqm-traefik-outpost</h3><p>Authentik proxy outpost :9000/:9300/:9443 for SSO enforcement on Traefik.</p><span class="tag">healthy</span></div>
+      </div>
+      <div class="conn">Connects to → L3 AI: one-api/zqm-litellm route to Ollama mesh; L5 Identity: outpost wired to authentik; L4 App: gateways expose chat/workflow/search</div>
+    </div>
+
+    <div class="layer">
+      <h2><span>L3 — AI</span><span class="tag">Ollama + 5 services</span></h2>
+      <div class="grid">
+        <div class="card"><h3>Ollama (N4 host)</h3><p>47 local models, <code>127.0.0.1:11434</code>, mesh router selects by model availability across N1/N2/N3/N4.</p><span class="tag">47 models</span></div>
+        <div class="card"><h3>Open WebUI</h3><p>Open-source Ollama/OpenAI chat UI at <code>webui.zqmlabs.com</code>, data volume mounted.</p><span class="tag">healthy</span></div>
+        <div class="card"><h3>AnythingLLM</h3><p>Local-first agent experience at <code>llm.zqmlabs.com</code>, storage + cert mounted.</p><span class="tag">healthy</span></div>
+        <div class="card"><h3>zqm-whisper</h3><p>faster-whisper server :8080, CPU-only transcription, model cache mounted.</p><span class="tag">healthy</span></div>
+        <div class="card"><h3>zqm-stirling</h3><p>Stirling-PDF v2.14.2, edit/manipulate/convert PDFs, custom files + tessdata mounted.</p><span class="tag">healthy</span></div>
+      </div>
+      <div class="conn">Connects to → L4 App: n8n/Flowise orchestrate model calls; L2 Backends: one-api/litellm route providers; L6 Data: model metadata + jobs in Postgres/Redis</div>
+    </div>
+
+    <div class="layer">
+      <h2><span>L4 — App</span><span class="tag">5 services</span></h2>
+      <div class="grid">
+        <div class="card"><h3>n8n</h3><p>Workflow automation :5678, data volume mounted, authentik gated, cors restricted.</p><span class="tag">healthy</span></div>
+        <div class="card"><h3>Flowise</h3><p>Low-code LLM workflow builder, data volume mounted, no host port published.</p><span class="tag">healthy</span></div>
+        <div class="card"><h3>zqm-chat</h3><p>Chatbot UI :3000, Traefik host routing, MIT-licensed.</p><span class="tag">healthy</span></div>
+        <div class="card"><h3>zqm-home</h3><p>Homepage dashboard :3000, Docker + service API integrations, GPL-3.0.</p><span class="tag">healthy</span></div>
+        <div class="card"><h3>SearXNG</h3><p>Privacy metasearch :8080, localhost-bound, settings/templates mounted.</p><span class="tag">healthy</span></div>
+      </div>
+      <div class="conn">Connects to → L5 Identity: n8n/webui behind authentik; L3 AI: call Ollama/Open WebUI; L6 Data: persist workflows in Postgres/Redis</div>
+    </div>
+
+    <div class="layer">
+      <h2><span>L5 — Identity</span><span class="tag">5 services</span></h2>
+      <div class="grid">
+        <div class="card"><h3>authentik-server</h3><p>SSO/identity provider 2024.10.2, media + custom-templates mounted.</p><span class="tag">healthy</span></div>
+        <div class="card"><h3>authentik-worker</h3><p>Background worker for authentik, depends on redis/postgres healthy.</p><span class="tag">healthy</span></div>
+        <div class="card"><h3>zqm-traefik-outpost</h3><p>Proxy outpost for Traefik SSO enforcement, healthchecks enabled.</p><span class="tag">healthy</span></div>
+        <div class="card"><h3>zqm-web</h3><p>Static nginx site :8090, serves contact/services/privacy, expected 403 on root.</p><span class="tag">:8090 healthy</span></div>
+        <div class="card"><h3>zqm-status</h3><p>Uptime Kuma status page/monitor, localhost-bound :3001.</p><span class="tag">healthy</span></div>
+      </div>
+      <div class="conn">Connects to → L6 Data: authentik stores state in Postgres/Redis; L1 Edge: outpost enforces auth at Traefik</div>
+    </div>
+
+    <div class="layer">
+      <h2><span>L6 — Data</span><span class="tag">3 stores</span></h2>
+      <div class="grid">
+        <div class="card"><h3>zqm-redis</h3><p>Redis 7-alpine :6379, ephemeral cache, authentik sessions, broker.</p><span class="tag">healthy</span></div>
+        <div class="card"><h3>zqm-postgres</h3><p>Postgres 16-alpine :5432, durable store for authentik + application data.</p><span class="tag">healthy</span></div>
+        <div class="card"><h3>flatspace_local.db</h3><p>SQLite local task/audit/ledger store on N4, 6 tiers: pollenstore/bitgarden/waxcell/entangle/quantumcell/voidcache.</p><span class="tag">local</span></div>
+      </div>
+      <div class="conn">Connects to → L7 Void Nodes: durable task:* and task_result:* records; L8 Observability: metrics + event logs</div>
+    </div>
+
+    <div class="layer">
+      <h2><span>L7 — Void API Nodes</span><span class="tag">5 nodes</span></h2>
+      <div class="grid">
+        <div class="card"><h3>N1 — 192.168.1.224:8099</h3><p>ZQM-Void-N1 via NSSM, codebase <code>ZQM-AI-Master-p8</code>, 76 routes, SSH password auth.</p><span class="tag">v2.1.4 RUNNING</span></div>
+        <div class="card"><h3>N2 — 192.168.1.31:22</h3><p>Mesh node reachable on SSH, Ed25519 key rejected, no confirmed Void API.</p><span class="tag warn">AUTH REJECTED</span></div>
+        <div class="card"><h3>N3 — 192.168.1.78:8808</h3><p>ZQM-Void-N3 via nssm, 75 routes, SSH reachable, quantum/verify healthy.</p><span class="tag">v2.1.4 RUNNING</span></div>
+        <div class="card"><h3>N4 — 192.168.1.228:8808</h3><p>Primary dev host, ZQM-Void-N4, 93 routes, 23 Docker containers, 47 Ollama models, active PID 37872.</p><span class="tag">v2.1.4 PRIMARY</span></div>
+        <div class="card"><h3>COMB — 192.168.1.225</h3><p>Proxmox VE present, void-server/operatorboard-api services known, but Void API dead.</p><span class="tag err">DEAD</span></div>
+      </div>
+      <div class="conn">Connects to → L8 Observability/Cost; L9 Self-X; L10 Mesh/Host; L6 Data via FLATSPACE; L3 AI via Ollama mesh</div>
+    </div>
+
+    <div class="layer">
+      <h2><span>L8 — Observability / Cost</span><span class="tag">Prometheus + cost tracker</span></h2>
+      <div class="grid">
+        <div class="card"><h3>Prometheus metrics</h3><p>Unauthenticated <code>/api/observability/metrics</code> exposes counters/histograms: tasks_total, task_duration_seconds, tokens_total, agents_active, cache_hit_rate, routing_overrides_total, task_cost_usd_total.</p><span class="tag">enabled=false</span></div>
+        <div class="card"><h3>Cost tracker</h3><p><code>app/services/cost_tracker.py</code> per-million pricing catalog: Ollama=$0.00, gpt-4o, claude-sonnet-4, claude-opus-4, gemini-2.5-pro/flash.</p><span class="tag">integrated</span></div>
+        <div class="card"><h3>Mesh federation</h3><p>Batch flush to remote observability endpoint with 10-item batch size, 100 retry cap.</p><span class="tag">local only</span></div>
+      </div>
+      <div class="conn">Connects to → L7 Void Nodes: metrics scraped per node; L9 Self-X: self-improve/expand audit events; L6 Data: ledger + waxcell</div>
+    </div>
+
+    <div class="layer">
+      <h2><span>L9 — Self-X</span><span class="tag">Self-aware + self-executing</span></h2>
+      <div class="grid">
+        <div class="card"><h3>Garden coordination</h3><p><code>/api/garden/coordinate</code> distributes jobs across 5 nodes. Primary .228, fallback round-robin, local fallback.</p><span class="tag">5 nodes</span></div>
+        <div class="card"><h3>Self-improve</h3><p><code>/api/self-improve/run</code> scans 5 known safe patches, unique-match + compile-check, .bak, audited to ledger + waxcell. Gated by ZQM_SELF_APPLY.</p><span class="tag">5 proposed / 0 applied</span></div>
+        <div class="card"><h3>Self-expand</h3><p><code>/api/self-expand/apply</code> parses EXPAND_AGENT / EXPAND_TOOL / PATCH directives, whitelist validation, runtime-only agents, audited.</p><span class="tag">gated</span></div>
+        <div class="card"><h3>Self-replicate</h3><p><code>/api/self-replicate</code> deploys logical Void replica to N1/N2/N3/N4 via paramiko + git bundle, fresh SECRET_KEY, <code>confirm=true</code> required.</p><span class="tag">gated</span></div>
+        <div class="card"><h3>Falsification protocol</h3><p>8 defenses: hardware float drift, KV-cache eviction, manifest integrity, working-memory boundary, normalization entropy, constraint/seeds, world-state fingerprint, external consistency.</p><span class="tag">8/8 live</span></div>
+        <div class="card"><h3>Void talk</h3><p><code>/api/void/talk</code> conversational surface. Routes to live agent when Ollama reachable; otherwise honest self-reflection.</p><span class="tag">HTTP 200</span></div>
+      </div>
+      <div class="conn">Connects to → L7 Void Nodes: self-X endpoints served by FastAPI; L6 Data: ledgers + waxcell durable audit</div>
+    </div>
+
+    <div class="layer">
+      <h2><span>L10 — Mesh / Host</span><span class="tag">5 nodes + host services</span></h2>
+      <div class="grid">
+        <div class="card"><h3>N1 (.224)</h3><p>Windows host, nssm service, C:\Void\ZQM-AI-Master-p8, SSH password auth, Void API :8099.</p><span class="tag">76 routes</span></div>
+        <div class="card"><h3>N2 (.31)</h3><p>Windows host, SSH reachable :22, Ed25519 key rejected, no confirmed Void API.</p><span class="tag warn">AUTH CEILING</span></div>
+        <div class="card"><h3>N3 (.78)</h3><p>Windows host, nssm service, SSH reachable, Void API :8808.</p><span class="tag">75 routes</span></div>
+        <div class="card"><h3>N4 (.228)</h3><p>Primary dev host, 23 Docker containers, 47 Ollama models, 96GB RAM, 5TB C: free, PID 37872 system Python.</p><span class="tag">93 routes</span></div>
+        <div class="card"><h3>COMB (.225)</h3><p>Proxmox VE present, void-server/operatorboard-api services known, but Void API dead.</p><span class="tag err">DEAD STUB</span></div>
+        <div class="card"><h3>Host services</h3><p>Docker Desktop, Windows Dnscache (port 53), Traefik/coredns/dot containers, NSSM, paramiko SSH bridge.</p><span class="tag">running</span></div>
+      </div>
+      <div class="conn">Connects to → L11 Security/Improvements: SSH keys, Windows Firewall, Docker cleanup, TLS trust; L7 Void Nodes: each node is both a client and a host</div>
+    </div>
+
+    <div class="layer">
+      <h2><span>L11 — Security / Improvements</span><span class="tag">verified live</span></h2>
+      <div class="grid">
+        <div class="card"><h3>CORS</h3><p>FastAPI <code>allow_origins=*</code>; Traefik strip-cors + restricted cors middleware for webui/n8n. evil origin → ACAO=none.</p><span class="tag">strict at edge</span></div>
+        <div class="card"><h3>JWT Auth</h3><p>HS256, 24h expiry, login <code>/api/users/login</code>, 401 strict on missing/empty/tampered token. Internal service keys HMAC-derived.</p><span class="tag">200/401 verified</span></div>
+        <div class="card"><h3>TLS cert</h3><p>zqm-mesh.crt 39 SAN + IP .228, valid 2036, imported Windows Trusted Root. Python requires explicit cafile.</p><span class="tag">Trusted</span></div>
+        <div class="card"><h3>DNS / Hosts</h3><p>CoreDNS Docker-internal :53, Unbound DoT :853, 57 Windows hosts entries, *.zqm + *.zqm.mesh + *.zqmlabs.com → .228/.224.</p><span class="tag">36/36 checks</span></div>
+        <div class="card"><h3>Docker cleanup</h3><p>Pruned 17 unused images, 22 images remain, 34.37GB, removed host port 53 conflicts.</p><span class="tag">22 images</span></div>
+        <div class="card"><h3>Mesh SSH</h3><p>paramiko bridge user zqmlocal, N1 password auth works, N2/N4 Ed25519 rejected.</p><span class="tag warn">partial</span></div>
+      </div>
+      <div class="conn">Connects to → L10 Mesh/Host: SSH/Windows services; L1 Edge: cert + hosts + CORS are ingress-layer controls</div>
+    </div>
+
+    <div class="layer">
+      <h2><span>L12 — System / Resources / Falsification</span><span class="tag">live state</span></h2>
+      <div class="grid">
+        <div class="card"><h3>Memory</h3><p>98,021 MB total, 51,048 MB available. 96GB Dell XPS 8960, i9-14900KF.</p><span class="tag">52% free</span></div>
+        <div class="card"><h3>Disk</h3><p>C: 5,008 GB free / 7,429 GB total (67.4%). Docker 34.37GB used, 0% reclaimable.</p><span class="tag">67.4% free</span></div>
+        <div class="card"><h3>Containers</h3><p>23/23 UP healthy. 22 images. No reclaimable bloat after prune.</p><span class="tag">23/23 healthy</span></div>
+        <div class="card"><h3>Falsification audit</h3><p>8 defenses live: hardware drift, KV eviction, manifest integrity, working-memory boundary, normalization entropy, constraint/seeds, world-state fingerprint, external consistency.</p><span class="tag">8/8 defenses</span></div>
+        <div class="card"><h3>API surface</h3><p>93 total HTTP routes; 62 GET, 26 POST, 1 PATCH, 3 DELETE, 1 PUT. Key groups: /api/process, /api/status, /api/info, /api/users, /api/falsification, /api/flatspace, /api/garden, /api/observability, /api/self-*, /api/void/talk, /api/predict, /api/train, /api/webhooks, /api/permissions, /api/internal, /api/mesh, /api/quantum, /api/settings, /api/dashboard.</p><span class="tag">93 routes</span></div>
+        <div class="card"><h3>Runtime note</h3><p>Active HTTP 8808 listener is PID 37872 from <code>C:\Program Files\Python312\python.exe</code>; not the NSSM-managed venv interpreter. pyc caches cleared; still not under NSSM control.</p><span class="tag warn">needs remediation</span></div>
+      </div>
+      <div class="conn">System envelope: all layers sit on top of these resources; falsification protocol audits every task’s world-state + consistency</div>
+    </div>
+
+    <div class="layer">
+      <h2><span>Live Data Overlay (N4 · 2026-08-04)</span><span class="tag">verified</span></h2>
+      <div class="grid">
+        <div class="card"><h3>Core endpoints</h3><p><code>/api/version</code> → 2.1.4 · <code>/api/status</code> → healthy, uptime ~473s · <code>/api/garden/health</code> → nodes=5 · <code>/api/observability/health</code> → prometheus_client=true, enabled=false</p><span class="tag">200</span></div>
+        <div class="card"><h3>Auth</h3><p>Login HTTP 200 with JWT. No-token/empty/tampered → 401. CORS wildcard in FastAPI; edge restricts webui/n8n.</p><span class="tag">strict</span></div>
+        <div class="card"><h3>Cost tracking</h3><p>Pipeline live. Basic 258 tokens / $0.00. Advanced 7,303 tokens / $0.00. Neural 8,185 tokens / $0.00. Prometheus counter <code>zqm_ai_task_cost_usd_total</code> exposed.</p><span class="tag">$0.00 local</span></div>
+        <div class="card"><h3>Mesh nodes</h3><p>N1 .224 SSH REACHABLE, quantum channel closed · N2 .31 SSH REACHABLE, quantum ok · N3 .78 SSH REACHABLE, quantum ok · N4 .228 SSH REACHABLE, quantum channel closed · COMB .225 DEAD</p><span class="tag">3/5 quantum</span></div>
+        <div class="card"><h3>DNS/TLS</h3><p>13/13 Docker hostnames resolve to .228. 13/13 HTTPS 200. cert SAN 39 DNS + IP .228. 57 hosts entries.</p><span class="tag">green</span></div>
+        <div class="card"><h3>Self-X</h3><p>self-improve 5 proposed / 0 applied · self-expand 0 applied · self-replicate propose-only unless ZQM_SELF_APPLY=1 + confirm=true · void/talk HTTP 200</p><span class="tag">gated</span></div>
+      </div>
+    </div>
+
+    <div class="sub">Artifacts: void-operations-diagram.html · void-3d-explorer.html · full-system-enumeration.md · C:\temp\live_system_state.json · C:\temp\moltbook_monitor\moltbook_full_review_live.json</div>
+  </div>
+</body>
+</html>

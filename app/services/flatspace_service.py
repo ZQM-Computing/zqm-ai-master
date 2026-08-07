@@ -78,9 +78,32 @@ class FlatSpaceService:
     # ── Embeddings (best-effort, for semantic store/search) ────────────
     async def _embed_text(self, text: str) -> Optional[list]:
         """Embed text for semantic search. Returns None on any failure."""
+        # Prefer direct local Ollama embeddings to avoid mesh model availability issues.
+        try:
+            async with httpx.AsyncClient(timeout=60) as client:
+                r = await client.post(
+                    f"{settings.ollama_base_url}/api/embeddings",
+                    json={"model": "all-minilm:latest", "prompt": text[:8000]},
+                )
+                r.raise_for_status()
+                vec = r.json().get("embedding")
+                if vec:
+                    return vec
+        except Exception as exc:
+            log.debug("FLATSPACE local embed failed", error=str(exc))
+
+        # Fallback to mesh router if local backend is unavailable.
         try:
             from app.services.mesh_ollama import router as mesh_ollama
-            data = await mesh_ollama.embed(text[:8000])
+            data = await mesh_ollama.embed(settings.ollama_default_model, text[:8000])
+            vec = data.get("embedding")
+            if vec:
+                return vec
+        except Exception as exc:
+            log.debug("FLATSPACE mesh embed failed", error=str(exc))
+        try:
+            from app.services.mesh_ollama import router as mesh_ollama
+            data = await mesh_ollama.embed(settings.ollama_default_model, text[:8000])
             vec = data.get("embedding")
             if vec:
                 return vec
@@ -272,10 +295,29 @@ class FlatSpaceService:
         Search FLATSPACE memory by query string (semantic or key-based).
         Returns matched records.
         """
+        # Prefer local semantic search when embeddings are available.
+        try:
+            qv = await self._embed_text(query)
+        except Exception:
+            qv = None
+        if qv:
+            try:
+                return self._local.search(query, tier, limit, query_embedding=qv)
+            except Exception:
+                pass
+
+        # Meilisearch full-text fallback when configured.
+        try:
+            from app.services.meilisearch_service import search as meili_search
+            meili_hits = meili_search(tier, query, limit)
+            if meili_hits:
+                return meili_hits[:limit]
+        except Exception:
+            pass
+
         base = settings.flatspace_endpoint.rsplit("/store", 1)[0]
         if FLATSPACE_MODE != "remote" and self._remote_known_down:
-            qv = await self._embed_text(query)
-            return self._local.search(query, tier, limit, query_embedding=qv)
+            return self._local.search(query, tier, limit)
         try:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
                 resp = await client.post(
@@ -288,8 +330,7 @@ class FlatSpaceService:
         except Exception as exc:
             log.warning("FLATSPACE search failed", query=query, error=str(exc))
             if FLATSPACE_MODE != "remote":
-                qv = await self._embed_text(query)
-                return self._local.search(query, tier, limit, query_embedding=qv)
+                return self._local.search(query, tier, limit)
             return []
 
     # ── Tier info ─────────────────────────────────────────────────────────────

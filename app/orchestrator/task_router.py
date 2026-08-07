@@ -21,18 +21,18 @@ log = get_logger("task-router")
 
 # Default cognitive level per input method
 INPUT_METHOD_COGNITIVE_MAP: Dict[str, CognitiveLevel] = {
-    InputMethod.CHAT: CognitiveLevel.ADVANCED,
+    InputMethod.CHAT: CognitiveLevel.AUTONOMOUS,
     InputMethod.MAP_INPUT: CognitiveLevel.NEURAL,
-    InputMethod.FILE_UPLOAD: CognitiveLevel.ADVANCED,
+    InputMethod.FILE_UPLOAD: CognitiveLevel.AUTONOMOUS,
     InputMethod.CALCULATORS: CognitiveLevel.NEURAL,
-    InputMethod.WIZARDS: CognitiveLevel.ADVANCED,
+    InputMethod.WIZARDS: CognitiveLevel.AUTONOMOUS,
     InputMethod.VIDEO_CONSULTATION: CognitiveLevel.NEURAL,
-    InputMethod.API_INTEGRATIONS: CognitiveLevel.ADVANCED,
-    InputMethod.EMAIL_PARSER: CognitiveLevel.ADVANCED,
+    InputMethod.API_INTEGRATIONS: CognitiveLevel.AUTONOMOUS,
+    InputMethod.EMAIL_PARSER: CognitiveLevel.AUTONOMOUS,
     InputMethod.SMS_SERVICE: CognitiveLevel.BASIC,
     InputMethod.QR_CODE_SYSTEM: CognitiveLevel.BASIC,
-    InputMethod.MOBILE_FIELD: CognitiveLevel.ADVANCED,
-    InputMethod.DIRECT_API: CognitiveLevel.ADVANCED,
+    InputMethod.MOBILE_FIELD: CognitiveLevel.AUTONOMOUS,
+    InputMethod.DIRECT_API: CognitiveLevel.AUTONOMOUS,
 }
 
 # ZQM Garden priority per input method (from zqm-garden-compute-rules.json)

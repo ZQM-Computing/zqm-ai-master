@@ -68,6 +68,12 @@ if PROMETHEUS_AVAILABLE:
         ["reason"],
         registry=_registry,
     )
+    TASK_COST_USD = Counter(
+        "zqm_ai_task_cost_usd_total",
+        "Total estimated task cost in USD",
+        ["provider", "model"],
+        registry=_registry,
+    )
 
 
 class ObservabilityService:
@@ -93,14 +99,16 @@ class ObservabilityService:
     # ── Health ────────────────────────────────────────────────────────────────
 
     async def health_check(self) -> bool:
-        """Ping Observability endpoint."""
+        """
+        Observability pipeline health.
+        If enabled: check local metrics endpoint availability.
+        If disabled: healthy no-op.
+        """
         if not self._enabled:
-            return True  # No-op if disabled
+            return True
         try:
             async with httpx.AsyncClient(timeout=3) as client:
-                resp = await client.get(
-                    self._endpoint.replace("/metrics", "/health")
-                )
+                resp = await client.get(self._endpoint)
                 return resp.status_code < 500
         except Exception as exc:
             log.debug("Observability health check failed", error=str(exc))
@@ -143,6 +151,7 @@ class ObservabilityService:
             ),
             "diversity_ratio": getattr(result, "diversity_ratio", None),
             "co_task_pairs": co_task_pairs,
+            "cost_usd": result.cost_usd if result else None,
         }
 
         # Update Prometheus counters
@@ -164,6 +173,12 @@ class ObservabilityService:
                         provider=result.provider_used,
                         model=result.model_used,
                     ).inc(result.total_tokens)
+
+                if result and result.cost_usd and result.provider_used and result.model_used:
+                    TASK_COST_USD.labels(
+                        provider=result.provider_used,
+                        model=result.model_used,
+                    ).inc(result.cost_usd)
 
                 routing = None
                 if task.cognitive_trace and getattr(task.cognitive_trace, "routing", None):

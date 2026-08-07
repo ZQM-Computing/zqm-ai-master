@@ -76,6 +76,7 @@ class AgentCapability(str, Enum):
     DATABASE_QUERY = "database_query"
     FILE_PROCESSING = "file_processing"
     MONITORING = "monitoring"
+    TASK_PLANNING = "task_planning"
 
 
 # ── Agent Models ──────────────────────────────────────────────────────────────

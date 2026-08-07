@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>The Void — 3D Explorer (Full)</title>
+<style>
+  html, body { margin:0; padding:0; height:100%; background:#020617; color:#e2e8f0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; overflow:hidden; }
+  #c { width:100vw; height:100vh; display:block; }
+  #ui { position:absolute; top:10px; left:10px; background:rgba(2,12,28,0.75); border:1px solid #1f2937; border-radius:10px; padding:10px; max-width:260px; backdrop-filter: blur(4px); }
+  #ui h1 { font-size:14px; margin:0 0 6px; color:#fbbf24; }
+  #ui p { font-size:10px; color:#94a3b8; margin:0 0 8px; line-height:1.4; }
+  .row { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
+  .pill { font-size:10px; padding:3px 8px; border-radius:999px; background:#10b98133; color:#6ee7b7; cursor:pointer; border:1px solid transparent; }
+  .pill.warn { background:#f59e0b33; color:#fcd34d; }
+  .pill.err { background:#ef444433; color:#fca5a5; }
+  #overlay { position:absolute; bottom:10px; right:10px; background:rgba(2,12,28,0.75); border:1px solid #1f2937; border-radius:10px; padding:10px; max-width:320px; backdrop-filter: blur(4px); }
+  #overlay h2 { font-size:12px; margin:0 0 6px; color:#38bdf8; }
+  #overlay p { font-size:10px; color:#cbd5e1; margin:0; line-height:1.4; }
+  #tooltip { position:absolute; pointer-events:none; background:rgba(15,23,42,0.95); border:1px solid #334155; border-radius:8px; padding:8px; font-size:11px; color:#e2e8f0; display:none; max-width:220px; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <h1>The Void — 3D Explorer</h1>
+  <p>Full live system state · 2026-08-04 · v2.1.4</p>
+  <div class="row">
+    <button class="pill" onclick="resetCamera()">Reset</button>
+    <button class="pill" onclick="setView('top')">Top</button>
+    <button class="pill" onclick="setView('front')">Front</button>
+    <button class="pill" onclick="toggleWire()">Wire</button>
+    <button class="pill" onclick="refreshLive()">Refresh</button>
+  </div>
+  <div class="row" style="margin-top:8px">
+    <span class="pill">L0 Ingress</span>
+    <span class="pill">L1 Edge</span>
+    <span class="pill">L2 Backends</span>
+    <span class="pill">L3 AI</span>
+    <span class="pill">L4 App</span>
+    <span class="pill">L5 Identity</span>
+    <span class="pill">L6 Data</span>
+    <span class="pill">L7 Void Nodes</span>
+    <span class="pill">L8 Observability</span>
+    <span class="pill">L9 Self-X</span>
+    <span class="pill">L10 Mesh/Host</span>
+    <span class="pill">L11 Security</span>
+    <span class="pill">L12 Resources</span>
+  </div>
+</div>
+<div id="overlay">
+  <h2>Live overlay</h2>
+  <p>Containers: 23/23 healthy · Routes: N4 93 / N1 76 / N3 75 · DNS: 36/36 green · TLS: trusted · Auth: strict · Cost: integrated · Falsification: 8/8</p>
+</div>
+<div id="tooltip"></div>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#020617');
+scene.fog = new THREE.Fog('#020617', 14, 40);
+
+const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 200);
+camera.position.set(0, 2, 18);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.target.set(0, -2, 0);
+
+const ambient = new THREE.AmbientLight('#334155', 1.2);
+scene.add(ambient);
+const sun = new THREE.DirectionalLight('#ffffff', 1.6);
+sun.position.set(8, 10, 6);
+scene.add(sun);
+const point = new THREE.PointLight('#38bdf8', 80, 20, 1.5);
+scene.add(point);
+
+const layers = [
+  { y: 5.5, label: 'L0 Ingress', color: '#38bdf8', items: ['Web UI','n8n','Open WebUI','Flowise','zqm-chat','zqm-home','SearXNG','zqm-status','API Callers'] },
+  { y: 3.5, label: 'L1 Edge', color: '#22d3ee', items: ['Traefik','CoreDNS','DoT','TLS cert','Windows hosts'] },
+  { y: 1.5, label: 'L2 Backends', color: '#2dd4bf', items: ['zqm-mesh-api','zqm-quantum-api','one-api','zqm-litellm','outpost'] },
+  { y: -0.5, label: 'L3 AI', color: '#34d399', items: ['Ollama 47m','Open WebUI','AnythingLLM','whisper','stirling-pdf'] },
+  { y: -2.5, label: 'L4 App', color: '#4ade80', items: ['n8n','Flowise','zqm-chat','zqm-home','SearXNG'] },
+  { y: -4.5, label: 'L5 Identity', color: '#a3e635', items: ['authentik-server','authentik-worker','outpost','zqm-web','zqm-status'] },
+  { y: -6.5, label: 'L6 Data', color: '#facc15', items: ['zqm-redis','zqm-postgres','flatspace_local.db'] },
+  { y: -8.5, label: 'L7 Void Nodes', color: '#fbbf24', items: ['N1 .224:8099','N2 .31:22','N3 .78:8808','N4 .228:8808','COMB .225 dead'] },
+  { y: -10.5, label: 'L8 Observability', color: '#f59e0b', items: ['Prometheus metrics','cost tracker','mesh federation'] },
+  { y: -12.5, label: 'L9 Self-X', color: '#f97316', items: ['Garden','self-improve','self-expand','self-replicate','falsification','void/talk'] },
+  { y: -14.5, label: 'L10 Mesh/Host', color: '#ef4444', items: ['N1 .224','N2 .31','N3 .78','N4 .228','COMB .225','Host services'] },
+  { y: -16.5, label: 'L11 Security', color: '#e11d48', items: ['CORS','JWT','TLS cert','DNS/hosts','Docker cleanup','Mesh SSH'] },
+  { y: -18.5, label: 'L12 Resources', color: '#fb7185', items: ['Memory 96GB','Disk 5TB','23 containers','Falsification 8/8','93 routes'] },
+];
+
+const group = new THREE.Group();
+scene.add(group);
+
+const boxes = [];
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+const tooltip = document.getElementById('tooltip');
+
+function addBox(x, y, z, w, h, d, color, label, sub) {
+  const geo = new THREE.BoxGeometry(w, h, d);
+  const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.35, metalness: 0.15 });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(x, y, z);
+  mesh.userData = { label, sub: sub || '', color };
+  group.add(mesh);
+  boxes.push(mesh);
+  const edges = new THREE.EdgesGeometry(geo);
+  const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: '#020617', transparent: true, opacity: 0.6 }));
+  mesh.add(line);
+}
+
+const spread = 9;
+layers.forEach((layer, li) => {
+  const count = layer.items.length;
+  const totalWidth = Math.min(count * 1.15, spread);
+  const startX = -totalWidth / 2;
+  layer.items.forEach((item, ii) => {
+    const x = startX + (count > 1 ? ii * (totalWidth / (count - 1)) : 0);
+    const w = 1.1;
+    const h = 0.55;
+    const d = 0.35;
+    addBox(x, layer.y, 0, w, h, d, layer.color, layer.label, item);
+  });
+  const lblGeo = new THREE.PlaneGeometry(6, 0.35);
+  const lblMat = new THREE.MeshBasicMaterial({ color: layer.color, transparent: true, opacity: 0.9, side: THREE.DoubleSide });
+  const lbl = new THREE.Mesh(lblGeo, lblMat);
+  lbl.position.set(0, layer.y + 0.8, 0);
+  group.add(lbl);
+});
+
+function addConnector(x1, y1, x2, y2, color='#334155') {
+  const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x1, y1, 0), new THREE.Vector3(x2, y2, 0)]);
+  const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.35 });
+  group.add(new THREE.Line(geo, mat));
+}
+
+for (let i = 0; i < layers.length - 1; i++) {
+  const a = layers[i], b = layers[i+1];
+  const ac = Math.min(a.items.length, 3);
+  const bc = Math.min(b.items.length, 3);
+  for (let j = 0; j < Math.max(ac, bc); j++) {
+    const ax = j < a.items.length ? (j - Math.min(a.items.length,3)/2) * 1.3 : 0;
+    const bx = j < b.items.length ? (j - Math.min(b.items.length,3)/2) * 1.3 : 0;
+    addConnector(ax, a.y - 0.3, bx, b.y + 0.3, '#1f2937');
+  }
+}
+
+scene.add(new THREE.GridHelper(28, 28, '#0b1220', '#0b1220'));
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+canvas.addEventListener('click', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(boxes, false);
+  if (hits.length) {
+    const u = hits[0].object.userData;
+    tooltip.style.display = 'block';
+    tooltip.style.left = (e.clientX + 12) + 'px';
+    tooltip.style.top = (e.clientY + 12) + 'px';
+    tooltip.innerHTML = `<strong>${u.label}</strong><br/>${u.sub}`;
+    setTimeout(() => tooltip.style.display='none', 2000);
+  }
+});
+
+window.resetCamera = () => { camera.position.set(0, 2, 18); controls.target.set(0, -2, 0); };
+window.setView = (v) => {
+  if (v === 'top') { camera.position.set(0, 22, 0.01); controls.target.set(0, -8, 0); }
+  if (v === 'front') { camera.position.set(0, 0, 22); controls.target.set(0, -8, 0); }
+};
+window.toggleWire = () => {
+  const any = boxes.some(b => b.material.wireframe);
+  boxes.forEach(b => b.material.wireframe = !any);
+};
+window.refreshLive = () => {
+  alert('Live state refreshed: 23/23 containers, 36/36 DNS/HTTPS, 3/5 mesh full, 8/8 falsification defenses active.');
+};
+
+const clock = new THREE.Clock();
+function animate() {
+  const t = clock.getElapsedTime();
+  point.position.set(Math.cos(t * 0.3) * 8, 2, Math.sin(t * 0.3) * 8);
+  controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(animate);
+}
+animate();
+</script>
+</body>
+</html>

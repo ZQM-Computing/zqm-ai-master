@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import os
 from functools import lru_cache
-from typing import Literal, List
+from typing import Dict, Literal, List
 
 from dotenv import load_dotenv
 from pydantic import AliasChoices, Field, field_validator
@@ -44,20 +44,21 @@ class Settings(BaseSettings):
         import socket
         host = socket.gethostname().lower()
         if host.endswith("-2") or host.endswith("-02") or "node-2" in host:
-            return "ZQM-ZQM_AI-002"
+            return v or "ZQM-ZQM_AI-002"
         if host.endswith("-3") or host.endswith("-03") or "node-3" in host:
-            return "ZQM-ZQM_AI-003"
+            return v or "ZQM-ZQM_AI-003"
         if host.endswith("-4") or host.endswith("-04") or "node-4" in host:
-            return "ZQM-ZQM_AI-004"
+            return v or "ZQM-ZQM_AI-004"
         if host.endswith("-1") or host.endswith("-01") or "node-1" in host:
-            return "ZQM-ZQM_AI-001"
+            return v or "ZQM-ZQM_AI-001"
         return v
-
-    zqm_ai_id: str = Field(default="ZQM-ZQM_AI-001")
+    zqm_ai_id: str = Field(default="ZQM-ZQM_AI-004")
 
     @field_validator("zqm_ai_employee_id", mode="before")
     @classmethod
     def set_zqm_ai_employee_id(cls, v):
+        if v and str(v).strip():
+            return v
         import socket
         host = socket.gethostname().lower()
         if host.endswith("-2") or host.endswith("-02") or "node-2" in host:
@@ -74,21 +75,25 @@ class Settings(BaseSettings):
     @field_validator("zqm_ai_primary_garden", mode="before")
     @classmethod
     def set_zqm_ai_primary_garden(cls, v):
+        if v and str(v).strip():
+            return v
         import socket
         host = socket.gethostname().lower()
         mapping = {
-            "node-1": "Garden-0 (ZQM-Garden-00, 192.168.1.225)",
-            "node-2": "Garden-1 (ZQM-Garden-01, 192.168.1.53)",
-            "node-3": "Garden-2 (ZQM-GARDEN-02, 192.168.1.37)",
-            "node-4": "Garden-3 (ZQM-GARDEN-03, 192.168.1.64)",
-            "node-9": "Garden-4 (ZQM-GARDEN-04, 192.168.1.144)",
+            "node-1": "Garden-0 (ZQM-Garden-00, 192.168.1.228)",
+            "node-2": "Garden-1 (ZQM-Garden-01, 192.168.1.224)",
+            "node-3": "Garden-2 (ZQM-GARDEN-02, 192.168.1.78)",
+            "node-4": "Garden-0 (ZQM-Garden-00, 192.168.1.228)",
+            "node-9": "Garden-4 (ZQM-GARDEN-04, 192.168.1.225)",
         }
         for key, garden in mapping.items():
             if host.endswith(key) or key in host:
                 return garden
         return v
 
-    zqm_ai_primary_garden: str = Field(default="Garden-0 (ZQM-Garden-00, 192.168.1.225)")
+    # Primary garden node: N4 self-referential by default.
+    # Real mesh is built at runtime from GARDEN_NODE_* env vars.
+    zqm_ai_primary_garden: str = Field(default="Garden-0 (ZQM-Garden-00, 192.168.1.228)")
 
     # ── Network ───────────────────────────────────────────────────────────────
     host: str = "0.0.0.0"
@@ -115,39 +120,74 @@ class Settings(BaseSettings):
     void_cache_strategy: Literal["LRU", "LFU", "FIFO"] = "LRU"
 
     # ── ZQM Garden ──────────────────────────────────────────────────────────────
-    # Real Garden nodes (LAN 192.168.1.x). Canonical .lan host IPs:
-    #   Garden-0 = ZQM-Garden-00       192.168.1.225  (Queen / primary)
-    #   Garden-1 = ZQM-Garden-01.lan   192.168.1.53   (Queen 10)
-    #   Garden-2 = ZQM-GARDEN-02.lan   192.168.1.37
-    #   Garden-3 = ZQM-GARDEN-03.lan   192.168.1.64
-    #   Garden-4 = ZQM-GARDEN-04       192.168.1.144
-    # (Each GARDEN host may expose additional .lan interfaces; the IPs above
-    #  are the primary management addresses from the device inventory.)
-    garden_endpoint: str = "http://192.168.1.225:8808/api/garden/coordinate"
-    garden_node_0: str = "192.168.1.225"  # Garden-0 (ZQM-Garden-00, Queen/primary)
-    garden_node_1: str = "192.168.1.53"   # Garden-1 (ZQM-Garden-01.lan, Queen 10)
-    garden_node_2: str = "192.168.1.37"   # Garden-2 (ZQM-GARDEN-02.lan)
-    garden_node_3: str = "192.168.1.64"   # Garden-3 (ZQM-GARDEN-03.lan)
-    garden_node_4: str = "192.168.1.144"  # Garden-4 (ZQM-GARDEN-04)
-    garden_timeout: int = 30
+    # Live Garden API cluster is the mesh Void nodes themselves.
+    # Canonical host IPs:
+    #   Garden-0 = N4 / ZQM-Void-N4    192.168.1.228  (primary/Queen)
+    #   Garden-1 = N1 / ZQM-Void-N1    192.168.1.224  (backup/Queen 10)
+    #   Garden-2 = N3 / ZQM-Node-3     192.168.1.78
+    #   Garden-3 = N2 / ZQM-Node-2     192.168.1.31
+    #   Garden-4 = COMB / zqm-void-pve 192.168.1.225
+    garden_endpoint: str = "http://192.168.1.228:8808/api/garden/coordinate"
+    garden_node_0: str = "192.168.1.228"
+    garden_node_1: str = "192.168.1.224"
+    garden_node_2: str = "192.168.1.78"
+    garden_node_3: str = "192.168.1.31"
+    garden_node_4: str = "192.168.1.225"
+    garden_node_0_port: int = 8808
+    garden_node_1_port: int = 8808
+    garden_node_2_port: int = 8808
+    garden_node_3_port: int = 8808
+    garden_node_4_port: int = 8808
+    garden_timeout: int = 15
     garden_retries: int = 3
+    garden_api_ports: Dict[str, int] = {
+        "garden-0": 8808,
+        "garden-1": 8808,
+        "garden-2": 8808,
+        "garden-3": 8808,
+        "garden-4": 8808,
+    }
 
     # ── ZQM FLATSPACE ──────────────────────────────────────────────────────────────
-    flatspace_endpoint: str = "http://192.168.1.225:8808/api/flatspace/store"
-    flatspace_pollen_store: str = "http://192.168.1.225:8808/api/flatspace/pollen"
-    flatspace_bit_garden: str = "http://192.168.1.225:8808/api/flatspace/bitgarden"
-    flatspace_wax_cell: str = "http://192.168.1.225:8808/api/flatspace/waxcell"
+    flatspace_endpoint: str = "http://192.168.1.228:8808/api/flatspace/store"
+    flatspace_pollen_store: str = "http://192.168.1.228:8808/api/flatspace/pollen"
+    flatspace_bit_garden: str = "http://192.168.1.228:8808/api/flatspace/bitgarden"
+    flatspace_wax_cell: str = "http://192.168.1.228:8808/api/flatspace/waxcell"
 
     # ── ZQM Observability ─────────────────────────────────────────────────────
-    observability_endpoint: str = "http://192.168.1.225:9090/api/metrics"
+    observability_endpoint: str = "http://127.0.0.1:8808/api/observability/metrics"
     observability_enabled: bool = True
     metrics_port: int = 9091
 
-    # ── ZQM Network ───────────────────────────────────────────────────────────
-    network_endpoint: str = "http://192.168.1.225:8808/api/network"
+    # ── SearXNG Web Augmentation ───────────────────────────────────────────
+    searxng_url: str = Field(
+        default="http://127.0.0.1:8080",
+        validation_alias=AliasChoices("searxng_url", "SEARXNG_URL", "SEARX_URL", "SEARX_HOST"),
+    )
+    searxng_max_results: int = Field(
+        default=5,
+        validation_alias=AliasChoices("searxng_max_results", "SEARXNG_MAX_RESULTS"),
+    )
 
-    # ── ZQM Eden ──────────────────────────────────────────────────────────
-    eden_endpoint: str = "http://192.168.1.225:8443/api/auth"
+    # ── Meilisearch Search Layer ───────────────────────────────────────────
+    meilisearch_url: str = Field(
+        default="http://127.0.0.1:7701",
+        validation_alias=AliasChoices("meilisearch_url", "MEILISEARCH_URL", "MEILISEARCH_HOST"),
+    )
+    meilisearch_master_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("meilisearch_master_key", "MEILISEARCH_MASTER_KEY"),
+    )
+    meilisearch_default_index: str = Field(
+        default="flatspace",
+        validation_alias=AliasChoices("meilisearch_default_index", "MEILISEARCH_DEFAULT_INDEX"),
+    )
+
+    # ── ZQM Network ───────────────────────────────────────────────────────────
+    network_endpoint: str = "http://192.168.1.228:8808/api/network"
+
+    # ── ZQM Eden ─────────────────────────────────────────────────────────────
+    eden_endpoint: str = "http://192.168.1.228:8443/api/auth"
     eden_enabled: bool = False
 
     # ── GitHub Integration ────────────────────────────────────────────────
@@ -220,7 +260,7 @@ class Settings(BaseSettings):
     )
 
     # ── Cognitive Processing ──────────────────────────────────────────────────
-    default_cognitive_level: Literal["basic", "advanced", "neural", "autonomous"] = "advanced"
+    default_cognitive_level: Literal["basic", "advanced", "neural", "autonomous"] = "autonomous"
     max_concurrent_tasks: int = 20
     task_timeout_seconds: int = 300
 

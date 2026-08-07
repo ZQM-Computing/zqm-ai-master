@@ -49,8 +49,8 @@ RELEASE_NOTES = {
     "2.1.0": [
         "A-D: 21-agent pool, ATRM load-aware routing, tools (flatspace/ollama real; "
         "garden/observability fail-soft on dead remote; http_get gated by self-hosted mandate).",
-        "P1: Local FlatSpace SQLite store (comb_local.db renamed -> flatspace_local.db) so "
-        "memory/audit work offline when the remote COMB host (.225) is down.",
+        "P1: Local FlatSpace SQLite store (flatspace_local.db renamed -> flatspace_local.db) so "
+        "memory/audit work offline when the remote flatspace host (dead) is down.",
         "P2: Self-apply pipeline — panel can emit a structured PATCH; validated in staging "
         "(compile+import), promoted atomically, audited to waxcell, sets _needs_restart. "
         "Gated by ZQM_SELF_APPLY (default off).",
@@ -67,7 +67,7 @@ RELEASE_NOTES = {
     ],
     "2.0.0": [
         "Initial The Void AI Orchestration System — 21-agent pool, cognitive processor, "
-        "self-improvement loop (propose-only), FlatSpace tiered memory (remote COMB).",
+        "self-improvement loop (propose-only), FlatSpace tiered memory (remote flatspace).",
     ],
 }
 
@@ -80,6 +80,7 @@ def get_version() -> dict:
         "version": __version__,
         "codename": __codename__,
         "build_epoch": __build_epoch__,
-        "zqm_ai_id": "ZQM-ZQM_AI-001",
+        "zqm_ai_id": "ZQM-ZQM_AI-004",
         "components": RELEASE_NOTES.get(__version__, []),
     }
+

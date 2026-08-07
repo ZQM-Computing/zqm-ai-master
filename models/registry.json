@@ -1,0 +1,21 @@
+{
+  "poc-lora-v1": {
+    "model_id": "poc-lora-v1",
+    "base_model": "distilgpt2",
+    "variant": "lora",
+    "adapter_dir": "models/poc-lora",
+    "merged_dir": null,
+    "created_at": "2026-08-07T12:14:12Z",
+    "metrics": {
+      "train_loss": 5.063,
+      "train_samples_per_second": 4.3,
+      "dataset_size": 671
+    },
+    "tags": [
+      "poc",
+      "phase1",
+      "cpu"
+    ],
+    "note": "First LoRA adapter trained on Flatspace bitgarden+filesystem+waxcell data. CPU-only proof-of-concept."
+  }
+}

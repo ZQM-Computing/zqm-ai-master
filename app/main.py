@@ -18,7 +18,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict
 
-from fastapi import Depends, FastAPI, Query, Request, status
+from fastapi import Body, Depends, FastAPI, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -30,10 +30,10 @@ from app.models.response import ErrorResponse
 from app.services.mesh_ollama import OllamaUnavailable
 from app.orchestrator.zqm_ai_orchestrator import ZQM_AIOrchestrator
 from app.routers import (
-    dashboard, info, internal, permissions, predict, process, settings as settings_router,
-    status as status_router, train, users, webhooks, flatspace,
+    dashboard, garden, info, internal, observability, permissions, predict, process, settings as settings_router,
+    status as status_router, train, users, webhooks, flatspace, falsification,
 )
-from app.routers import mesh_probe, quantum_llm_bridge
+from app.routers import mesh_probe, mesh_ops, quantum_llm_bridge, void_council
 
 # ── Configure logging first ───────────────────────────────────────────────────
 configure_logging(
@@ -83,6 +83,38 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.orchestrator = orchestrator
     app.state.started_at = time.time()
 
+    # Redis lifecycle
+    try:
+        from app.services.redis_service import RedisService
+        redis = RedisService()
+        await redis.connect()
+        app.state.redis = redis
+    except Exception as exc:
+        log.warning("Redis startup failed", error=str(exc))
+        app.state.redis = None
+
+    # Council integrations after app state is available
+    try:
+        await orchestrator._void_council.initialize_integrations(
+            app=app,
+            observability=orchestrator.observability,
+            flatspace=orchestrator.flatspace,
+            garden=orchestrator.garden,
+            redis=getattr(app.state, "redis", None),
+        )
+    except Exception as exc:
+        log.debug("council integrations init skipped", error=str(exc))
+
+    # Startup sanity checks
+    try:
+        db_path = Path(__file__).resolve().parent / "flatspace_local.db"
+        if not db_path.exists():
+            log.warning("Local FLATSPACE DB missing", path=str(db_path))
+        else:
+            log.info("Local FLATSPACE DB present", path=str(db_path))
+    except Exception as exc:
+        log.debug("FLATSPACE startup check failed", error=str(exc))
+
     # Wire the webhook receiver to this orchestrator instance.
     from app.routers import webhooks as _webhooks
     _webhooks.set_orchestrator(orchestrator)
@@ -108,7 +140,7 @@ app = FastAPI(
         "Central AI orchestration engine for the ZQM ecosystem. "
         "Self-optimizing, multi-agent, cognitive processing platform by "
         "ZQM Computing LLC.\n\n"
-        "**ZQM_AI ID:** ZQM-ZQM_AI-001 | **Employee ID:** ZQM_AI-001 | "
+        "**ZQM_AI ID:** ZQM-ZQM_AI-004 | **Employee ID:** ZQM_AI-001 | "
         "**Primary Garden:** Garden-0 (ZQM-Garden-00, 192.168.1.225)\n\n"
         "## Cognitive Processing Levels\n"
         "- **basic** — Single-agent direct response\n"
@@ -467,14 +499,14 @@ async def self_improve_ledger(
 async def void_talk(
     request: Request,
     auth: Dict[str, Any] = Depends(require_admin),
-    message: str = "",
+    message: str = Body("", embed=True),
 ) -> JSONResponse:
     """Speak with The Void — conversational surface + continuous self-improvement hook."""
     orch = getattr(request.app.state, "orchestrator", None)
     if orch is None:
         return JSONResponse(status_code=503, content={"error": "orchestrator not ready"})
     try:
-        health = await orch.get_health()
+        health = await orch.get_health(request)
         # model_dump(mode="json") makes datetimes ISO-string serializable
         health_dict = health.model_dump(mode="json") if hasattr(health, "model_dump") else (dict(health) if health else None)
     except Exception:
@@ -870,6 +902,8 @@ async def mesh_ollama_status(
 app.include_router(process.router)
 app.include_router(status_router.router)
 app.include_router(dashboard.router)
+app.include_router(dashboard.alias_router)
+app.include_router(garden.router)
 app.include_router(predict.router)
 app.include_router(train.router)
 app.include_router(settings_router.router)
@@ -878,9 +912,21 @@ app.include_router(permissions.router)
 app.include_router(info.router)
 app.include_router(webhooks.router)
 app.include_router(flatspace.router)
+app.include_router(falsification.router)
 app.include_router(quantum_llm_bridge.router)
 app.include_router(mesh_probe.router)
 app.include_router(internal.router)
+app.include_router(observability.router)
+app.include_router(void_council.router)
+app.include_router(mesh_ops.router)
+from app.routers.rag import router as rag_router
+app.include_router(rag_router)
+from app.routers.reasoning import router as reasoning_router
+app.include_router(reasoning_router)
+from app.routers.train import router as train_router
+app.include_router(train_router)
+from app.routers.support import router as support_router
+app.include_router(support_router)
 
 
 # ── Dev server entry point ────────────────────────────────────────────────────

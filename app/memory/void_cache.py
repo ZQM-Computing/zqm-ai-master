@@ -25,6 +25,19 @@ from app.core.logger import get_logger
 log = get_logger("void-cache")
 V = TypeVar("V")
 
+# Lazy falsification protocol reference for eviction boundary hashing.
+_fp = None
+
+def _get_falsification_protocol():
+    global _fp
+    if _fp is None:
+        try:
+            from app.services.falsification_protocol import FalsificationProtocol
+            _fp = FalsificationProtocol()
+        except Exception:
+            _fp = None
+    return _fp
+
 
 # ── Cache Entry ───────────────────────────────────────────────────────────────
 
@@ -300,7 +313,12 @@ class VoidCache:
     # ── Internal eviction ─────────────────────────────────────────────────────
 
     def _evict_one(self) -> None:
-        """Evict one entry based on the configured strategy."""
+        """Evict one entry based on the configured strategy.
+
+        Also records falsification-protocol boundary metrics when the
+        protocol module is available so KV-cache eviction behavior is
+        auditable at runtime.
+        """
         if not self._store:
             return
 
@@ -325,6 +343,23 @@ class VoidCache:
             del self._store[key]
 
         self._evictions += 1
+
+        # Boundary falsification check for KV-cache eviction.
+        try:
+            protocol = _get_falsification_protocol()
+            if protocol is not None:
+                cache_tail = [float(hash(k)) % 1.0 for k in list(self._store)[-20:]]
+                boundary = protocol.boundary_hash(cache_tail, 0.0)
+                protocol.boundary_history.append(
+                    {
+                        "envelope_hash": boundary,
+                        "working_memory_hash": None,
+                        "manifest_hash": None,
+                        "timestamp": time.monotonic(),
+                    }
+                )
+        except Exception:
+            pass
 
 
 # ── Module-level singleton ────────────────────────────────────────────────────

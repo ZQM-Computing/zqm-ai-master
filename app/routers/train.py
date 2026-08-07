@@ -1,136 +1,145 @@
 """
-The Void AI Orchestration System — /api/train Router
-Version: 2.0.0 | ZQM Computing LLC
+Training router: /api/train/lora
 
-Knowledge ingestion and training endpoints.
+Accepts distributed training jobs and runs LoRA fine-tuning.
 """
-
 from __future__ import annotations
 
+import argparse
+import json
+import os
+import sys
+import time
+import uuid
 from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import JSONResponse
 
 from app.core.logger import get_logger
-from app.core.security import require_admin
-from app.models.response import ZQM_AIResponse
-from app.models.task import TrainRequest, TrainResult
+from app.core.security import get_current_token_payload, require_admin
 
-router = APIRouter(prefix="/api/train", tags=["Train"])
+router = APIRouter(prefix="/api/train", tags=["Training"])
 log = get_logger("router.train")
 
-
-@router.post(
-    "",
-    response_model=ZQM_AIResponse,
-    summary="Submit knowledge / training data",
-    status_code=status.HTTP_202_ACCEPTED,
-)
-async def submit_training(
-    request_body: TrainRequest,
-    request: Request,
-    auth: Dict[str, Any] = Depends(require_admin),
-) -> ZQM_AIResponse:
-    """
-    Feed knowledge or training examples into The Void.
-
-    Supported methods:
-    - `memory`: Store examples in FLATSPACE BitGarden for immediate recall
-    - `few-shot`: Register few-shot examples for prompt injection
-    - `fine-tune`: Trigger model fine-tuning (GPU-required, async)
-    - `rag`: Index documents for retrieval-augmented generation
-
-    **Example: Add GIS knowledge records**
-    ```json
-    {
-      "domain": "gis",
-      "method": "memory",
-      "data": [
-        {"concept": "floodplain", "definition": "Area prone to inundation..."},
-        {"concept": "FEMA Zone A", "definition": "Special flood hazard area..."}
-      ]
-    }
-    ```
-    """
-    orchestrator = request.app.state.orchestrator
-
-    # Store records in FLATSPACE memory
-    stored = 0
-    errors = []
-
-    for i, record in enumerate(request_body.data):
-        try:
-            key = f"train:{request_body.domain}:{request_body.method}:{i}"
-            await orchestrator.flatspace.store(
-                key=key,
-                value=record,
-                tier="bitgarden",
-                metadata={
-                    "domain": request_body.domain,
-                    "method": request_body.method,
-                    "source": "training_api",
-                },
-            )
-            stored += 1
-        except Exception as exc:
-            errors.append({"index": i, "error": str(exc)})
-
-    result = TrainResult(
-        status="completed" if not errors else "partial",
-        records_processed=stored,
-        domain=request_body.domain,
-        method=request_body.method,
-        message=f"Stored {stored}/{len(request_body.data)} records in {request_body.domain} domain",
-    )
-
-    if errors:
-        result = result.model_copy(update={"status": "partial"})
-
-    log.info(
-        "Training data submitted",
-        domain=request_body.domain,
-        method=request_body.method,
-        stored=stored,
-        errors=len(errors),
-    )
-
-    return ZQM_AIResponse.ok(
-        data=result.model_dump(),
-        message=result.message,
-    )
+# In-memory job registry (replace with DB in production)
+_TRAIN_JOBS: Dict[str, Dict[str, Any]] = {}
 
 
-@router.get(
-    "/domains",
-    response_model=ZQM_AIResponse,
-    summary="List knowledge domains",
-)
-async def list_domains() -> ZQM_AIResponse:
-    """Return all available knowledge domains."""
-    domains = [
-        {"id": "gis", "name": "Computing Information Systems", "description": "Spatial analysis, coordinates, projections"},
-        {"id": "hydrology", "name": "Hydrology & Water Resources", "description": "Flood risk, rainfall, storm surge, SLR"},
-        {"id": "network", "name": "Network Infrastructure", "description": "DNS, VPN, routing, firewalls"},
-        {"id": "infrastructure", "name": "Server Infrastructure", "description": "Containers, Queens, monitoring"},
-        {"id": "security", "name": "Security & Authentication", "description": "Eden, RBAC, audit trails"},
-        {"id": "general", "name": "General Knowledge", "description": "Cross-domain general purpose"},
-        {"id": "code", "name": "Code & Engineering", "description": "Python, PHP, PowerShell, APIs"},
-    ]
-    return ZQM_AIResponse.ok(data=domains, message=f"{len(domains)} domains available")
-
-
-@router.get(
-    "/status/{job_id}",
-    response_model=ZQM_AIResponse,
-    summary="Check training job status",
-)
-async def get_training_status(job_id: str, request: Request) -> ZQM_AIResponse:
-    """Check the status of an async training job."""
-    orchestrator = request.app.state.orchestrator
-    cached = await orchestrator.cache.get(f"train_job:{job_id}")
-    if not cached:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Training job {job_id} not found (may have completed)",
+def _run_training_job(job_id: str, params: Dict[str, Any]) -> None:
+    """Background training runner."""
+    _TRAIN_JOBS[job_id]["status"] = "running"
+    _TRAIN_JOBS[job_id]["started_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    try:
+        # Ensure local package imports are used, not OneDrive/.venv cached paths.
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        sys.path.insert(0, root)
+        os.chdir(root)
+        import importlib
+        for mod in ["app.orchestrator.agent_registry", "app.orchestrator.zqm_ai_orchestrator"]:
+            sys.modules.pop(mod, None)
+        from scripts.train_lora import train_lora as _train_lora
+        
+        def _safe_train_lora(**kwargs):
+            base_model = kwargs.get("base_model", "distilgpt2")
+            target_modules = kwargs.get("target_modules")
+            if target_modules:
+                return _train_lora(**kwargs)
+            candidate_sets = [
+                ["q_proj", "v_proj", "k_proj", "o_proj"],
+                ["c_attn", "c_proj"],
+                ["qkv_proj", "out_proj"],
+                ["query", "key", "value", "dense"],
+            ]
+            last_err = None
+            for cand in candidate_sets:
+                try:
+                    kwargs["target_modules"] = cand
+                    return _train_lora(**kwargs)
+                except Exception as exc:
+                    last_err = exc
+            raise last_err or RuntimeError("LoRA target-module selection failed")
+        
+        output_dir = params.get("output_dir", f"models/{job_id}")
+        result = _safe_train_lora(
+            base_model=params.get("base_model", "distilgpt2"),
+            dataset_path=params.get("dataset_path", "data/training_data_all.jsonl"),
+            output_dir=output_dir,
+            epochs=int(params.get("epochs", 1)),
+            batch_size=int(params.get("batch_size", 4)),
+            lora_rank=int(params.get("lora_rank", 8)),
+            lora_alpha=int(params.get("lora_alpha", 16)),
+            learning_rate=float(params.get("learning_rate", 2e-4)),
+            target_modules=params.get("target_modules"),
         )
-    return ZQM_AIResponse.ok(data=cached, message=f"Training job {job_id}")
+        _TRAIN_JOBS[job_id]["status"] = "completed"
+        _TRAIN_JOBS[job_id]["result"] = result
+        _TRAIN_JOBS[job_id]["completed_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    except Exception as exc:
+        _TRAIN_JOBS[job_id]["status"] = "failed"
+        _TRAIN_JOBS[job_id]["error"] = str(exc)
+        _TRAIN_JOBS[job_id]["failed_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+@router.post("/lora")
+async def submit_lora_job(
+    request: Request,
+    body: Dict[str, Any],
+    auth: Dict[str, Any] = Depends(get_current_token_payload),
+) -> JSONResponse:
+    """Submit a LoRA fine-tuning job."""
+    job_id = str(uuid.uuid4())
+    _TRAIN_JOBS[job_id] = {
+        "job_id": job_id,
+        "params": body,
+        "status": "queued",
+        "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+    
+    # Launch in background
+    import asyncio
+    loop = asyncio.get_event_loop()
+    loop.run_in_executor(None, _run_training_job, job_id, dict(body))
+    
+    return JSONResponse({
+        "job_id": job_id,
+        "status": "queued",
+        "params": body,
+        "message": "Training job submitted",
+    })
+
+
+@router.get("/lora/{job_id}")
+async def get_job_status(
+    job_id: str,
+    auth: Dict[str, Any] = Depends(get_current_token_payload),
+) -> JSONResponse:
+    """Get status of a training job."""
+    job = _TRAIN_JOBS.get(job_id)
+    if not job:
+        return JSONResponse({"error": "job_not_found"}, status_code=404)
+    return JSONResponse(job)
+
+
+@router.get("/lora")
+async def list_jobs(
+    auth: Dict[str, Any] = Depends(get_current_token_payload),
+) -> JSONResponse:
+    """List all training jobs."""
+    return JSONResponse({"jobs": list(_TRAIN_JOBS.values())})
+
+
+@router.delete("/lora/{job_id}")
+async def cancel_job(
+    job_id: str,
+    auth: Dict[str, Any] = Depends(require_admin),
+) -> JSONResponse:
+    """Cancel a training job."""
+    job = _TRAIN_JOBS.get(job_id)
+    if not job:
+        return JSONResponse({"error": "job_not_found"}, status_code=404)
+    if job["status"] in ("completed", "failed", "cancelled"):
+        return JSONResponse({"error": f"job_already_{job['status']}"}, status_code=400)
+    job["status"] = "cancelled"
+    job["cancelled_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    return JSONResponse({"job_id": job_id, "status": "cancelled"})
