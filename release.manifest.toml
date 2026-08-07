@@ -1,25 +1,8 @@
-# Sale-ready repository packaging manifest
-# Intended for customer delivery and installer builds.
-
 [artifacts]
-required = [
-  "app/",
-  "scripts/",
-  "docs/",
-  "requirements.txt",
-  "COMMERCIAL_LICENSE.md",
-  "CUSTOMER_INSTALL.md",
-  "docker-compose.yml",
-  ".env.example",
-  "VERSION",
-]
+required = ["app", "scripts", "docs", "requirements.txt", "COMMERCIAL_LICENSE.md", "CUSTOMER_INSTALL.md", "docker-compose.yml", ".env.example", "VERSION"]
 
 [installers]
-windows = [
-  "scripts/install_service.ps1",
-  "scripts/setup_env.ps1",
-  "scripts/verify_install.ps1",
-]
+windows = ["scripts/install_service.ps1", "scripts/setup_env.ps1", "scripts/verify_install.ps1", "scripts/auto_config.py"]
 
 [branding]
 default_customer_name = "Customer"

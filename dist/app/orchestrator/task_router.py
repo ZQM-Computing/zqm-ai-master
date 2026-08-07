@@ -1,0 +1,218 @@
+"""
+The Void AI Orchestration System — Task Router
+Version: 2.0.0 | ZQM Computing LLC
+
+Routes incoming tasks to the correct cognitive level, priority,
+and ZQM Garden compute strategy based on input method and context.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Dict, List, Optional, Tuple
+
+from app.core.config import settings
+from app.core.logger import get_logger
+from app.models.task import CognitiveLevel, InputMethod, TaskPriority, TaskRequest
+
+log = get_logger("task-router")
+
+
+# ── Routing Tables ────────────────────────────────────────────────────────────
+
+# Default cognitive level per input method
+INPUT_METHOD_COGNITIVE_MAP: Dict[str, CognitiveLevel] = {
+    InputMethod.CHAT: CognitiveLevel.AUTONOMOUS,
+    InputMethod.MAP_INPUT: CognitiveLevel.NEURAL,
+    InputMethod.FILE_UPLOAD: CognitiveLevel.AUTONOMOUS,
+    InputMethod.CALCULATORS: CognitiveLevel.NEURAL,
+    InputMethod.WIZARDS: CognitiveLevel.AUTONOMOUS,
+    InputMethod.VIDEO_CONSULTATION: CognitiveLevel.NEURAL,
+    InputMethod.API_INTEGRATIONS: CognitiveLevel.AUTONOMOUS,
+    InputMethod.EMAIL_PARSER: CognitiveLevel.AUTONOMOUS,
+    InputMethod.SMS_SERVICE: CognitiveLevel.BASIC,
+    InputMethod.QR_CODE_SYSTEM: CognitiveLevel.BASIC,
+    InputMethod.MOBILE_FIELD: CognitiveLevel.AUTONOMOUS,
+    InputMethod.DIRECT_API: CognitiveLevel.AUTONOMOUS,
+}
+
+# ZQM Garden priority per input method (from zqm-garden-compute-rules.json)
+INPUT_METHOD_PRIORITY_MAP: Dict[str, TaskPriority] = {
+    InputMethod.CHAT: TaskPriority.CRITICAL,
+    InputMethod.MAP_INPUT: TaskPriority.HIGH,
+    InputMethod.FILE_UPLOAD: TaskPriority.NORMAL,
+    InputMethod.CALCULATORS: TaskPriority.HIGH,
+    InputMethod.WIZARDS: TaskPriority.NORMAL,
+    InputMethod.VIDEO_CONSULTATION: TaskPriority.NORMAL,
+    InputMethod.API_INTEGRATIONS: TaskPriority.NORMAL,
+    InputMethod.EMAIL_PARSER: TaskPriority.NORMAL,
+    InputMethod.SMS_SERVICE: TaskPriority.HIGH,
+    InputMethod.QR_CODE_SYSTEM: TaskPriority.LOW,
+    InputMethod.MOBILE_FIELD: TaskPriority.HIGH,
+    InputMethod.DIRECT_API: TaskPriority.NORMAL,
+}
+
+# Garden distribution strategy per input method
+INPUT_METHOD_GARDEN_STRATEGY: Dict[str, str] = {
+    InputMethod.MAP_INPUT: "parallel",
+    InputMethod.FILE_UPLOAD: "queue_based",
+    InputMethod.CALCULATORS: "gpu_priority",
+    InputMethod.VIDEO_CONSULTATION: "sequential",
+    InputMethod.CHAT: "round_robin",
+    InputMethod.EMAIL_PARSER: "round_robin",
+    InputMethod.SMS_SERVICE: "round_robin",
+    InputMethod.API_INTEGRATIONS: "least_loaded",
+}
+
+# Keywords that elevate cognitive level
+AUTONOMOUS_KEYWORDS = [
+    "autonomous", "self-direct", "learn from", "optimize yourself",
+    "continuously improve", "analyze and adapt",
+]
+
+NEURAL_KEYWORDS = [
+    "remember", "recall", "session", "history", "context",
+    "spatial analysis", "flood model", "terrain", "multi-step",
+]
+
+
+class TaskRouter:
+    """
+    Routes a TaskRequest to the appropriate cognitive level, priority,
+    and Garden distribution strategy.
+
+    The router can override defaults in the request when the automatic
+    routing produces a better fit (e.g., upgrading a basic request to
+    neural if keywords suggest complex processing is needed).
+    """
+
+    def route(self, request: TaskRequest) -> TaskRequest:
+        """
+        Analyze the request and return an (optionally upgraded) copy
+        with routing decisions applied.
+
+        Returns a new TaskRequest — does not mutate the original.
+        """
+        return self.route_with_audit(request)[0]
+
+    def get_garden_strategy(self, input_method: str) -> str:
+        """Return the ZQM Garden distribution strategy for an input method."""
+        return INPUT_METHOD_GARDEN_STRATEGY.get(input_method, "round_robin")
+
+    # ── Private routing logic ─────────────────────────────────────────────────
+
+    def _determine_cognitive_level(self, request: TaskRequest) -> CognitiveLevel:
+        """
+        Determine the optimal cognitive level.
+
+        Priority order:
+        1. Explicit request (never downgrade from explicit)
+        2. Keyword-based elevation
+        3. Input method default
+        4. Settings default
+        """
+        input_lower = request.input.lower()
+        keyword_triggers: List[str] = []
+
+        # Check for autonomous keywords — always elevate
+        autonomous_hit = next((kw for kw in AUTONOMOUS_KEYWORDS if kw in input_lower), None)
+        if autonomous_hit:
+            keyword_triggers.append(autonomous_hit)
+            return CognitiveLevel.AUTONOMOUS
+
+        # Check for neural keywords
+        neural_hit = next((kw for kw in NEURAL_KEYWORDS if kw in input_lower), None)
+        if neural_hit:
+            keyword_triggers.append(neural_hit)
+            if request.cognitive_level in (CognitiveLevel.BASIC, CognitiveLevel.ADVANCED):
+                return CognitiveLevel.NEURAL
+
+        # Use input method default if request uses the system default
+        system_default = CognitiveLevel(settings.default_cognitive_level)
+        if request.cognitive_level == system_default:
+            method_default = INPUT_METHOD_COGNITIVE_MAP.get(
+                request.input_method, system_default
+            )
+            return method_default
+
+        # Respect explicit request level
+        return request.cognitive_level
+
+    def _determine_priority(self, request: TaskRequest) -> TaskPriority:
+        """
+        Determine task priority.
+
+        Use input method mapping unless an explicit (non-default) priority was set.
+        """
+        default_priority = TaskPriority.NORMAL
+        if request.priority != default_priority:
+            # Explicit priority — respect it
+            return request.priority
+
+        # Use input method priority
+        return INPUT_METHOD_PRIORITY_MAP.get(request.input_method, TaskPriority.NORMAL)
+
+    def analyze_requirements(self, request: TaskRequest) -> Dict[str, Any]:
+        """
+        Return a full analysis of task requirements for routing and
+        Garden resource allocation (used by ZQM_AIOrchestrator).
+        """
+        return {
+            "task_id": request.task_id,
+            "cognitive_level": request.cognitive_level,
+            "priority": request.priority,
+            "input_method": request.input_method,
+            "garden_strategy": self.get_garden_strategy(request.input_method),
+            "estimated_complexity": self._estimate_complexity(request),
+            "requires_gpu": request.input_method in (
+                InputMethod.CALCULATORS, InputMethod.VIDEO_CONSULTATION
+            ),
+            "requires_memory": request.cognitive_level in (
+                CognitiveLevel.NEURAL, CognitiveLevel.AUTONOMOUS
+            ),
+            "session_aware": request.session_id is not None,
+        }
+
+    def _estimate_complexity(self, request: TaskRequest) -> str:
+        """Rough complexity estimate: low | medium | high | very_high"""
+        level = request.cognitive_level
+        if level == CognitiveLevel.BASIC:
+            return "low"
+        elif level == CognitiveLevel.ADVANCED:
+            length = len(request.input)
+            return "medium" if length < 500 else "high"
+        elif level == CognitiveLevel.NEURAL:
+            return "high"
+        else:
+            return "very_high"
+
+    def route_with_audit(self, request: TaskRequest) -> Tuple[TaskRequest, Dict[str, Any]]:
+        """Route task and return routing metadata for observability/audit."""
+        original_level = request.cognitive_level
+        routed_level = self._determine_cognitive_level(request)
+        priority = self._determine_priority(request)
+        input_lower = request.input.lower()
+        keyword_triggers = [kw for kw in AUTONOMOUS_KEYWORDS + NEURAL_KEYWORDS if kw in input_lower]
+
+        if routed_level == CognitiveLevel.AUTONOMOUS:
+            reason = "autonomous_keyword"
+        elif routed_level == CognitiveLevel.NEURAL and original_level in (CognitiveLevel.BASIC, CognitiveLevel.ADVANCED):
+            reason = "neural_keyword"
+        elif routed_level != original_level and original_level != CognitiveLevel(settings.default_cognitive_level):
+            reason = "explicit_override"
+        else:
+            reason = "method_default"
+
+        routing_meta = {
+            "original_level": original_level.value if isinstance(original_level, CognitiveLevel) else str(original_level),
+            "routed_level": routed_level.value if isinstance(routed_level, CognitiveLevel) else str(routed_level),
+            "priority": priority.value if isinstance(priority, TaskPriority) else str(priority),
+            "reason": reason,
+            "input_method": request.input_method.value if isinstance(request.input_method, InputMethod) else str(request.input_method),
+            "keyword_triggers": keyword_triggers,
+        }
+
+        updated = request.model_copy(update={
+            "cognitive_level": routed_level,
+            "priority": priority,
+        })
+        return updated, routing_meta
