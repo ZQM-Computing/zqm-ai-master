@@ -102,8 +102,8 @@ class Settings(BaseSettings):
 
     # ── Security / JWT ────────────────────────────────────────────────────────
     secret_key: str = Field(
-        default="changeme-please-generate-with-openssl-rand-hex-32",
-        description="JWT signing key — MUST be overridden in production",
+        default="insecure-default-rotate-before-deployment",
+        description="JWT signing key — MUST be overridden in production with a strong random value",
     )
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 1440  # 24 hours
