@@ -38,5 +38,8 @@ test_write.txt
 void_service_launch_*.bat
 start_err.log
 
+# Release packaging output
+dist/
+
 # Docker/compose local artifacts
 docker-compose.override.yml
