@@ -35,8 +35,15 @@ class TestAgentModel:
             Agent(id="a1", name="Test", type="invalid_type", status="idle")
 
     def test_response_model(self):
-        """Response model should validate structure."""
-        from app.models.response import Response
-        r = Response(status="success", data={"key": "value"})
+        """ZQM_AIResponse model should validate structure."""
+        from app.models.response import ZQM_AIResponse
+        r = ZQM_AIResponse(status="success", data={"key": "value"})
         assert r.status == "success"
         assert r.data["key"] == "value"
+
+    def test_health_status_model(self):
+        """HealthStatus model should validate structure."""
+        from app.models.response import HealthStatus
+        h = HealthStatus(status="healthy", version="2.0.0")
+        assert h.status == "healthy"
+        assert h.version == "2.0.0"
