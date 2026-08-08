@@ -486,23 +486,45 @@ class VoidCouncil:
         except Exception as exc:
             log.debug("council history write failed", error=str(exc))
 
-    async def _apply_finding(self, finding: dict[str, Any]) -> bool:
-        """Best-effort apply for a single finding. Returns True if handled."""
+    async def _apply_finding(self, finding: dict[str, Any]) -> dict[str, Any]:
+        """Best-effort apply for a single finding.
+        Returns structured status: applied|deferred|rejected|failed.
+        """
         action = finding.get("action", "patch")
+        finding_id = finding.get("finding_id") or finding.get("id") or "unknown"
         try:
             if action == "config":
-                # Config findings are recorded, not auto-edited.
-                return True
+                return {"status": "applied", "action": action, "finding_id": finding_id}
             if action in {"patch", "feature"}:
                 from app.orchestrator import self_improve
                 p9 = await self_improve.scan_and_improve(self)
-                return bool(p9.get("actions"))
+                applied = bool(p9.get("actions"))
+                return {
+                    "status": "applied" if applied else "failed",
+                    "action": action,
+                    "finding_id": finding_id,
+                    "actions": p9.get("actions", []),
+                }
             if action == "remove":
-                # Deferred: removal needs human approval to avoid data loss.
-                return False
+                return {
+                    "status": "deferred",
+                    "action": action,
+                    "finding_id": finding_id,
+                    "reason": "removal requires human approval",
+                }
         except Exception as exc:
-            log.debug("finding apply failed", error=str(exc))
-        return False
+            log.debug(
+                "finding apply failed",
+                finding_id=finding_id,
+                action=action,
+                error=str(exc),
+            )
+        return {
+            "status": "failed",
+            "action": action,
+            "finding_id": finding_id,
+            "error": "apply raised exception",
+        }
 
     async def _load_recent_findings(self, limit: int = 8) -> str:
         if not self._history_path.exists():
