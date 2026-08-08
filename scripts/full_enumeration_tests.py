@@ -94,8 +94,12 @@ class TestSuite:
         self._record("service_version", r.status_code == 200, f"status={r.status_code}")
 
     def test_openapi_enumeration(self) -> None:
-        r = requests.get(f"{BASE}/openapi.json", timeout=10)
-        self._record("openapi_available", r.status_code == 200, f"status={r.status_code}")
+        try:
+            r = requests.get(f"{BASE}/openapi.json", timeout=10)
+            r.raise_for_status()
+        except Exception as e:
+            self._record("openapi_available", False, f"skipped: {type(e).__name__}")
+            return
         if r.status_code == 200:
             data = r.json()
             paths = list(data.get("paths", {}).keys())
