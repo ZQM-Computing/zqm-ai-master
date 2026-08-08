@@ -198,13 +198,7 @@ async def council_evidence(
     if orch is None or not hasattr(orch, "_void_council"):
         return JSONResponse({"error": "council not available"}, status_code=503)
     try:
-        from app.orchestrator.void_council import _garden_evidence, _mesh_evidence, _status_code_evidence, _codebase_evidence
-        evidence = ["Live system evidence:", "ROUTER_SENTINEL_LIVE"]
-        evidence.extend(_garden_evidence("http://127.0.0.1:8808"))
-        evidence.extend(_mesh_evidence("http://127.0.0.1:8808"))
-        evidence.extend(_status_code_evidence("http://127.0.0.1:8808"))
-        evidence.extend(_codebase_evidence())
-        evidence.append("Use only these evidence lines or exact code paths. If no evidence supports a claim, downgrade it to an evidence-based fallback finding.")
+        evidence = gather_council_evidence("http://127.0.0.1:8808")
     except Exception as exc:
         return JSONResponse({"success": False, "error": "evidence_gather_failed", "detail": str(exc)}, status_code=500)
     return JSONResponse(

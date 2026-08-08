@@ -19,6 +19,7 @@ import json
 import os
 import re
 import ssl
+import requests
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
@@ -100,11 +101,9 @@ def _status_code_evidence(base_path: str = "http://127.0.0.1:8808") -> List[str]
     for path in ["/api/healthz", "/api/version"]:
         url = f"{base_path}{path}"
         try:
-            with urllib.request.urlopen(url, timeout=6.0) as resp:
-                out.append(f"EVIDENCE: GET {path} -> {resp.status}")
-        except urllib.error.HTTPError as exc:
-            out.append(f"EVIDENCE: GET {path} -> {exc.code}")
-        except Exception:
+            resp = requests.get(url, timeout=6.0)
+            out.append(f"EVIDENCE: GET {path} -> {resp.status_code}")
+        except requests.RequestException:
             out.append(f"EVIDENCE: GET {path} -> unreachable")
     return out
 
