@@ -23,12 +23,14 @@ from app.core.logger import get_logger
 
 log = get_logger("mesh_ollama")
 
+from mesh_connect import NODE_IPS
+
 # Default mesh topology: N2, N3, N4 are compute nodes with Ollama.
 # N1 is a management/gateway node without Ollama.
 DEFAULT_BACKENDS: List[Dict[str, Any]] = [
-    {"name": "N2", "url": "http://192.168.1.31:11434", "local": False},
-    {"name": "N3", "url": "http://192.168.1.78:11434", "local": False},
-    {"name": "N4", "url": "http://192.168.1.228:11434", "local": False},
+    {"name": "N2", "url": f"http://{NODE_IPS['N2']}:11434", "local": False},
+    {"name": "N3", "url": f"http://{NODE_IPS['N3']}:11434", "local": False},
+    {"name": "N4", "url": f"http://{NODE_IPS['N4']}:11434", "local": False},
 ]
 
 _CIRCUIT_TRIP = 3
