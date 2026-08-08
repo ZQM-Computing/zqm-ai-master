@@ -22,10 +22,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app.core.config import settings
 
 DB_PATH = "app/flatspace_local.db"
-COLLECTION_ID = "dd30a638-4e24-4af6-9bb5-42e66f200803"
+COLLECTION_ID = "477b326c-f754-454f-8842-dd4247a4630a"
 COLLECTION_PATH = f"/api/v2/tenants/default_tenant/databases/default_database/collections/{COLLECTION_ID}"
 BATCH = 100
-EMBED_MODEL = "all-minilm:latest"
+EMBED_MODEL = "bge-m3:latest"
 EMBED_URL = "http://127.0.0.1:11434/api/embeddings"
 
 
@@ -117,19 +117,23 @@ def _upsert_batch(docs: list[dict]) -> None:
     if texts:
         try:
             import urllib.request as _urllib_request
-            payload = json.dumps({"model": EMBED_MODEL, "prompt": texts}).encode()
-            req = _urllib_request.Request(
-                EMBED_URL,
-                data=payload,
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            with _urllib_request.urlopen(req, timeout=120) as r:
-                emb_data = json.loads(r.read().decode())
-            embeddings = emb_data.get("embeddings", [])
+            for text in texts:
+                payload = json.dumps({"model": EMBED_MODEL, "prompt": text}).encode()
+                req = _urllib_request.Request(
+                    EMBED_URL,
+                    data=payload,
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                with _urllib_request.urlopen(req, timeout=120) as r:
+                    emb_data = json.loads(r.read().decode())
+                embeddings.append(emb_data.get("embedding", []))
         except Exception as exc:
             print("embed_failed", exc)
-            embeddings = [[] for _ in texts]
+            embeddings = None
+    if embeddings is None or len(embeddings) != len(docs):
+        print("skip_batch embedding unavailable for this batch")
+        return
 
     ids = []
     documents = []
@@ -138,14 +142,17 @@ def _upsert_batch(docs: list[dict]) -> None:
     for idx, doc in enumerate(docs):
         ids.append(doc["id"])
         documents.append(doc.get("text", json.dumps(doc.get("value", "")) if isinstance(doc.get("value"), (dict, list)) else str(doc.get("value", ""))))
-        metadatas.append(
-            {
-                "key": doc.get("key"),
-                "tier": doc.get("tier"),
-                "created": doc.get("created"),
-                "metadata": doc.get("metadata") if isinstance(doc.get("metadata"), dict) else {},
-            }
-        )
+        meta = {
+            "key": doc.get("key"),
+            "tier": doc.get("tier"),
+            "created": doc.get("created"),
+        }
+        raw_meta = doc.get("metadata")
+        if isinstance(raw_meta, dict):
+            for mkey, mval in raw_meta.items():
+                if isinstance(mval, (str, int, float, bool)):
+                    meta[str(mkey)] = mval
+        metadatas.append(meta)
 
     payload = {
         "ids": ids,
