@@ -1,1 +1,0 @@
-fresh_redis_status=ok health={'status': 'ok', 'redis_url': 'redis://localhost:6379/0', 'version': '8.10.0'}

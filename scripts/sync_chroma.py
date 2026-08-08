@@ -109,14 +109,34 @@ def docs_from_db() -> list[dict]:
 
 
 def _upsert_batch(docs: list[dict]) -> None:
-    ids = []
+    texts = []
+    for doc in docs:
+        texts.append(doc.get("text", "") or "")
+
     embeddings = []
+    if texts:
+        try:
+            import urllib.request as _urllib_request
+            payload = json.dumps({"model": EMBED_MODEL, "prompt": texts}).encode()
+            req = _urllib_request.Request(
+                EMBED_URL,
+                data=payload,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with _urllib_request.urlopen(req, timeout=120) as r:
+                emb_data = json.loads(r.read().decode())
+            embeddings = emb_data.get("embeddings", [])
+        except Exception as exc:
+            print("embed_failed", exc)
+            embeddings = [[] for _ in texts]
+
+    ids = []
     documents = []
     metadatas = []
 
-    for doc in docs:
+    for idx, doc in enumerate(docs):
         ids.append(doc["id"])
-        embeddings.append([])
         documents.append(doc.get("text", json.dumps(doc.get("value", "")) if isinstance(doc.get("value"), (dict, list)) else str(doc.get("value", ""))))
         metadatas.append(
             {

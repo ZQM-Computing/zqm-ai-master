@@ -1,7 +1,0 @@
-health_check called enabled=True available=True client=<redis.asyncio.client.Redis(<redis.asyncio.connection.ConnectionPool(<redis.asyncio.connection.Connection(password=<REDACTED>,decode_responses=True,socket_connect_timeout=2,socket_timeout=2,host=localhost,port=6379,db=0,maint_notifications_pool_handler=<redis.asyncio.maint_notifications.AsyncMaintNotificationsPoolHandler object at 0x000001559C4E3170>,maint_notifications_config=MaintNotificationsConfig(enabled=auto, proactive_reconnect=True, relaxed_timeout=10, endpoint_type=None),orig_host_address=localhost,orig_socket_timeout=2,orig_socket_connect_timeout=2)>)>)>
-ping ok
-info ok version=8.10.0
-health_check called enabled=True available=True client=None
-client is None, connecting...
-connected=True client=<redis.asyncio.client.Redis(<redis.asyncio.connection.ConnectionPool(<redis.asyncio.connection.Connection(password=<REDACTED>,decode_responses=True,socket_connect_timeout=2,socket_timeout=2,host=localhost,port=6379,db=0,maint_notifications_pool_handler=<redis.asyncio.maint_notifications.AsyncMaintNotificationsPoolHandler object at 0x000001559D500890>,maint_notifications_config=MaintNotificationsConfig(enabled=auto, proactive_reconnect=True, relaxed_timeout=10, endpoint_type=None),orig_host_address=localhost,orig_socket_timeout=2,orig_socket_connect_timeout=2)>)>)>
-info ok version=8.10.0
