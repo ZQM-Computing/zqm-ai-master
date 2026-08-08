@@ -11,6 +11,12 @@ Usage:
   zqm-ai-master logs [--tail N] [--follow]
   zqm-ai-master test [paths ...]
   zqm-ai-master version
+  zqm-ai-master void-version [--host HOST] [--port PORT]
+  zqm-ai-master council-domains [--host HOST] [--port PORT]
+  zqm-ai-master council-history [--host HOST] [--port PORT] [--limit N]
+  zqm-ai-master council-convene [--host HOST] [--port PORT] [--domain DOMAIN] [--auto-apply]
+  zqm-ai-master void-talk [--host HOST] [--port PORT] [--message MSG]
+  zqm-ai-master self-improve [--host HOST] [--port PORT]
 """
 from __future__ import annotations
 
@@ -18,6 +24,7 @@ import argparse
 import json
 import os
 import socket
+import subprocess
 import sys
 from pathlib import Path
 from typing import List, Optional
@@ -50,13 +57,25 @@ def _mask_dict(d: dict) -> dict:
     return {k: ("****" if any(s in k.lower() for s in _SECRET_KEYS) else v) for k, v in d.items()}
 
 
-def _http_get(path: str, host: str, port: int) -> Optional[requests.Response]:
+def _http_get(path: str, host: str, port: int) -> Optional["requests.Response"]:
     url = f"http://{host}:{port}{path}"
     if requests is None:
         print(f"requests not installed; cannot call {url}")
         return None
     try:
         return requests.get(url, timeout=5)
+    except Exception as exc:
+        print(f"request failed: {exc}")
+        return None
+
+
+def _http_post(path: str, host: str, port: int, payload: dict) -> Optional["requests.Response"]:
+    url = f"http://{host}:{port}{path}"
+    if requests is None:
+        print(f"requests not installed; cannot call {url}")
+        return None
+    try:
+        return requests.post(url, json=payload, timeout=60)
     except Exception as exc:
         print(f"request failed: {exc}")
         return None
@@ -94,6 +113,15 @@ def _request(args: argparse.Namespace, path: str) -> int:
     if r is None:
         return 2
     print(f"GET {path} -> {r.status_code}")
+    print(r.text[:4000])
+    return 0 if r.ok else 1
+
+
+def _request_post(args: argparse.Namespace, path: str, payload: dict) -> int:
+    r = _http_post(path, args.host, args.port, payload)
+    if r is None:
+        return 2
+    print(f"POST {path} -> {r.status_code}")
     print(r.text[:4000])
     return 0 if r.ok else 1
 
@@ -222,6 +250,38 @@ def cmd_version(_: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_void_version(args: argparse.Namespace) -> int:
+    return _request(args, "/api/version")
+
+
+def cmd_council_domains(args: argparse.Namespace) -> int:
+    return _request(args, "/api/void-council/domains")
+
+
+def cmd_council_history(args: argparse.Namespace) -> int:
+    limit = int(getattr(args, "limit", 20) or 20)
+    return _request(args, f"/api/void-council/history?limit={limit}")
+
+
+def cmd_council_convene(args: argparse.Namespace) -> int:
+    payload: dict = {}
+    domain = getattr(args, "domain", None)
+    if domain:
+        payload["domain"] = domain
+    if getattr(args, "auto_apply", False):
+        payload["auto_apply"] = True
+    return _request_post(args, "/api/void-council/convene", payload)
+
+
+def cmd_void_talk(args: argparse.Namespace) -> int:
+    message = getattr(args, "message", None) or ""
+    return _request_post(args, "/api/void/talk", {"message": message})
+
+
+def cmd_self_improve(args: argparse.Namespace) -> int:
+    return _request_post(args, "/api/self-improve/run", {})
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     ap = argparse.ArgumentParser(prog="zqm-ai-master")
     ap.add_argument("--host", default="127.0.0.1")
@@ -246,6 +306,17 @@ def main(argv: Optional[list[str]] = None) -> int:
     p_test.add_argument("paths", nargs="*")
     sub.add_parser("version")
 
+    p_void_version = sub.add_parser("void-version")
+    p_council_domains = sub.add_parser("council-domains")
+    p_council_history = sub.add_parser("council-history")
+    p_council_history.add_argument("--limit", type=int, default=20)
+    p_council_convene = sub.add_parser("council-convene")
+    p_council_convene.add_argument("--domain", default=None)
+    p_council_convene.add_argument("--auto-apply", action="store_true")
+    p_void_talk = sub.add_parser("void-talk")
+    p_void_talk.add_argument("--message", default=None)
+    p_self_improve = sub.add_parser("self-improve")
+
     ns = ap.parse_args(argv)
     if not ns.command:
         ap.print_help()
@@ -262,6 +333,12 @@ def main(argv: Optional[list[str]] = None) -> int:
         "logs": cmd_logs,
         "test": cmd_test,
         "version": cmd_version,
+        "void-version": cmd_void_version,
+        "council-domains": cmd_council_domains,
+        "council-history": cmd_council_history,
+        "council-convene": cmd_council_convene,
+        "void-talk": cmd_void_talk,
+        "self-improve": cmd_self_improve,
     }
     fn = mapping.get(ns.command)
     if fn is None:
