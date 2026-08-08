@@ -79,9 +79,16 @@ class TestSuite:
             self._record("dist_artifacts_count", len(artifacts) > 0, f"count={len(artifacts)}")
 
     def test_service_state(self) -> None:
-        r = requests.get(f"{BASE}/healthz", timeout=5)
+        try:
+            r = requests.get(f"{BASE}/healthz", timeout=2)
+            r.raise_for_status()
+        except Exception:
+            self._record("service_healthz", False, "skipped: service not running")
+            self._record("service_api_healthz", False, "skipped: service not running")
+            self._record("service_version", False, "skipped: service not running")
+            return
         self._record("service_healthz", r.status_code == 200, f"status={r.status_code}")
-        r = requests.get(f"{BASE}/api/healthz", timeout=10)
+        r = requests.get(f"{BASE}/api/healthz", timeout=5)
         self._record("service_api_healthz", r.status_code == 200, f"status={r.status_code}")
         r = requests.get(f"{BASE}/api/version", timeout=5)
         self._record("service_version", r.status_code == 200, f"status={r.status_code}")
