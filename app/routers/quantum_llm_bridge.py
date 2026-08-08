@@ -159,7 +159,7 @@ def _run_ssh(target: str, mode: str, payload: Optional[str], timeout: int) -> Di
     try:
         import paramiko
     except ImportError:
-        return {"status": "error", "error": "paramiko not installed in The Void venv"}
+        return {"status": "error", "error": "paramiko not installed in The Void venv; quantum bridge requires SSH transport"}
     pw = os.environ.get("QUANTUM_LLM_SSH_PW", "EllaRose89!")
     user, _, host = target.partition("@")
     if not host:
