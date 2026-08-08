@@ -1,0 +1,18 @@
+title = "zqm-ai-master gitleaks config"
+
+[allowlist]
+paths = [
+  '''\.gitleaks\.toml$''',
+  '''(^|/)secrets/''',
+  '''(^|/)\.env$''',
+  '''\.example$''',
+  '''\.sample$''',
+]
+
+[[allowlist.regexes]]
+description = "allow base64-encoded test fixtures"
+regex = '''^[A-Za-z0-9+/]{64,}={0,2}$'''
+
+[[allowlist.regexes]]
+description = "allow hex-encoded test fixtures"
+regex = '''^[0-9a-fA-F]{64,}$'''
