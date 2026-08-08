@@ -33,6 +33,7 @@ logs/
 
 # Local runtime artifacts
 flatspace_local.db
+flatspace_local.db-*
 test_ps.txt
 test_write.txt
 void_service_launch_*.bat
