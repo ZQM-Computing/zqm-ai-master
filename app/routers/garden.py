@@ -176,7 +176,7 @@ async def garden_metrics(request: Request) -> dict[str, Any]:
                     "provider": a.provider,
                     "garden_node": a.garden_node,
                 }
-                for a in ([first] + rest)
+                for a in ([first, *rest])
             ]
         except Exception as exc:
             log.warning("Garden metrics live registry lookup failed", error=str(exc))

@@ -55,7 +55,7 @@ except Exception as e:
 print('\n=== full_audit empty-state ===')
 try:
     report = orchestrator.falsification.full_audit({})
-    assert report.get('all_passed') == True
+    assert report.get('all_passed')
     print('[OK] empty-state full_audit returns all_passed=true')
 except Exception as e:
     print('[FAIL]', e)

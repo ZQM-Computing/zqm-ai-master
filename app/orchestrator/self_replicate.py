@@ -240,7 +240,7 @@ async def replicate_to(orchestrator: Any, node: str, confirm: bool = False) -> d
         f'/SC ONSTART /RU SYSTEM /F >nul 2>&1 & '
         f'schtasks /Run /TN "{svc_name}" >nul 2>&1'
     )
-    out2, err2 = _ssh(node, launch, timeout=120)
+    _out2, err2 = _ssh(node, launch, timeout=120)
     applied = (not err2)
     _audit(orchestrator, {**proposal, "phase": "deployed" if applied else "launch_failed",
                           "applied": applied, "error": err2, "service": svc_name,

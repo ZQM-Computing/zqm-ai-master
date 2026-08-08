@@ -760,7 +760,7 @@ async def mcp_audit(
 async def roundtable(
     request: Request,
     auth: dict[str, Any] = Depends(get_current_token_payload),
-    body: dict[str, Any] = None,
+    body: dict[str, Any] | None = None,
 ) -> JSONResponse:
     """
     Convene a multi-agent roundtable IN-VOID. Body: {topic, panel?, rounds?}.

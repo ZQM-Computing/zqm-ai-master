@@ -64,7 +64,7 @@ def _panel_for_topic(topic: str | None) -> list[str] | None:
     t = topic.lower()
     if any(kw in t for kw in _GEO_KEYWORDS):
         # Geo/hydro topic: generalists + the two domain specialists.
-        return DEFAULT_PANEL + ["ZQM-GIS-Analyst", "ZQM-Hydro-Expert"]
+        return [*DEFAULT_PANEL, "ZQM-GIS-Analyst", "ZQM-Hydro-Expert"]
     return None  # general topic -> default generalist panel
 
 
