@@ -198,6 +198,7 @@ async def council_evidence(
     if orch is None or not hasattr(orch, "_void_council"):
         return JSONResponse({"error": "council not available"}, status_code=503)
     try:
+        from app.orchestrator.void_council import gather_council_evidence
         evidence = gather_council_evidence("http://127.0.0.1:8808")
     except Exception as exc:
         return JSONResponse({"success": False, "error": "evidence_gather_failed", "detail": str(exc)}, status_code=500)
