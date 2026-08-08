@@ -1,0 +1,64 @@
+{
+  "ZQM-Computing/dotfiles": {
+    "LICENSE": true,
+    "README": true,
+    "license_paths": [
+      "LICENSE"
+    ]
+  },
+  "ZQM-Computing/zqm-node-01-indexer": {
+    "LICENSE": true,
+    "README": true,
+    "license_paths": [
+      "LICENSE",
+      "LICENSE.md"
+    ]
+  },
+  "ZQM-Computing/dev-setup": {
+    "LICENSE": true,
+    "README": true,
+    "license_paths": [
+      "LICENSE"
+    ]
+  },
+  "ZQM-Labs/zqm-workstage2": {
+    "LICENSE": true,
+    "README": true,
+    "license_paths": [
+      "LICENSE"
+    ]
+  },
+  "ZQM-Labs/zqm-attestation-toolkit-clean": {
+    "LICENSE": true,
+    "README": false,
+    "license_paths": [
+      "LICENSE"
+    ]
+  },
+  "ZQM-Labs/nsgi-ors-pipeline": {
+    "LICENSE": false,
+    "README": false,
+    "license_paths": []
+  },
+  "ZQM-Labs/Daly": {
+    "LICENSE": true,
+    "README": true,
+    "license_paths": [
+      "LICENSE"
+    ]
+  },
+  "ZQM-Labs/EaglesNest": {
+    "LICENSE": true,
+    "README": true,
+    "license_paths": [
+      "LICENSE"
+    ]
+  },
+  "ZQM-Labs/Whitefeather": {
+    "LICENSE": true,
+    "README": true,
+    "license_paths": [
+      "LICENSE"
+    ]
+  }
+}

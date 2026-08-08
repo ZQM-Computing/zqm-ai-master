@@ -80,11 +80,11 @@ class Settings(BaseSettings):
         import socket
         host = socket.gethostname().lower()
         mapping = {
-            "node-1": "Garden-0 (ZQM-Garden-00, 192.168.1.228)",
-            "node-2": "Garden-1 (ZQM-Garden-01, 192.168.1.224)",
-            "node-3": "Garden-2 (ZQM-GARDEN-02, 192.168.1.78)",
-            "node-4": "Garden-0 (ZQM-Garden-00, 192.168.1.228)",
-            "node-9": "Garden-4 (ZQM-GARDEN-04, 192.168.1.225)",
+            "node-1": "Garden-1 (ZQM-Garden-01, 192.168.1.172)",
+            "node-2": "Garden-3 (ZQM-GARDEN-03, 192.168.1.64)",
+            "node-3": "Garden-2 (ZQM-GARDEN-02, 192.168.1.38)",
+            "node-4": "Garden-0 (ZQM-Garden-00, 192.168.1.225)",
+            "node-9": "Garden-4 (ZQM-GARDEN-04, 192.168.1.144)",
         }
         for key, garden in mapping.items():
             if host.endswith(key) or key in host:
@@ -93,7 +93,7 @@ class Settings(BaseSettings):
 
     # Primary garden node: N4 self-referential by default.
     # Real mesh is built at runtime from GARDEN_NODE_* env vars.
-    zqm_ai_primary_garden: str = Field(default="Garden-0 (ZQM-Garden-00, 192.168.1.228)")
+    zqm_ai_primary_garden: str = Field(default="Garden-0 (ZQM-Garden-00, 192.168.1.225)")
 
     # ── Network ───────────────────────────────────────────────────────────────
     host: str = "0.0.0.0"
@@ -122,17 +122,17 @@ class Settings(BaseSettings):
     # ── ZQM Garden ──────────────────────────────────────────────────────────────
     # Live Garden API cluster is the mesh Void nodes themselves.
     # Canonical host IPs:
-    #   Garden-0 = N4 / ZQM-Void-N4    192.168.1.228  (primary/Queen)
-    #   Garden-1 = N1 / ZQM-Void-N1    192.168.1.224  (backup/Queen 10)
-    #   Garden-2 = N3 / ZQM-Node-3     192.168.1.78
-    #   Garden-3 = N2 / ZQM-Node-2     192.168.1.31
-    #   Garden-4 = COMB / zqm-void-pve 192.168.1.225
-    garden_endpoint: str = "http://192.168.1.228:8808/api/garden/coordinate"
-    garden_node_0: str = "192.168.1.228"
-    garden_node_1: str = "192.168.1.224"
-    garden_node_2: str = "192.168.1.78"
-    garden_node_3: str = "192.168.1.31"
-    garden_node_4: str = "192.168.1.225"
+    #   Garden-0 = COMB / zqm-void-pve    192.168.1.225  (primary/Queen)
+    #   Garden-1 = ZQM-Garden-01          192.168.1.172  (backup/Queen 11)
+    #   Garden-2 = ZQM-GARDEN-02          192.168.1.38   (worker)
+    #   Garden-3 = ZQM-GARDEN-03          192.168.1.64   (worker)
+    #   Garden-4 = ZQM-GARDEN-04          192.168.1.144  (worker)
+    garden_endpoint: str = "http://192.168.1.225:8808/api/garden/coordinate"
+    garden_node_0: str = "192.168.1.225"
+    garden_node_1: str = "192.168.1.172"
+    garden_node_2: str = "192.168.1.38"
+    garden_node_3: str = "192.168.1.64"
+    garden_node_4: str = "192.168.1.144"
     garden_node_0_port: int = 8808
     garden_node_1_port: int = 8808
     garden_node_2_port: int = 8808
