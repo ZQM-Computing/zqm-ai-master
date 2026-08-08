@@ -33,11 +33,22 @@ jobs:
       - name: Set timestamp
         id: timestamp
         run: echo "timestamp=$(date -u +%Y%m%dT%H%M%SZ)" >> "$GITHUB_OUTPUT"
+      - name: Locate scanner SARIF
+        id: scan-sarif
+        run: |
+          mkdir -p ".zqm-security-reports/${{ github.repository }}"
+          SCAN_SARIF=$(find ".zqm-security-reports/${{ github.repository }}" -maxdepth 1 -name '*-results.sarif' | sort | tail -n 1 || true)
+          if [ -z "$SCAN_SARIF" ]; then
+            echo '{"version":"2.1.0","runs":[]}' > ".zqm-security-reports/${{ github.repository }}/empty-results.sarif"
+            SCAN_SARIF=".zqm-security-reports/${{ github.repository }}/empty-results.sarif"
+          fi
+          echo "path=$SCAN_SARIF" >> "$GITHUB_OUTPUT"
       - name: Upload SARIF
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: .zqm-security-reports/${{ github.repository }}/${{ steps.timestamp.outputs.timestamp }}-results.sarif
-        if: always()
+          sarif_file: ${{ steps.scan-sarif.outputs.path }}
+        if: |
+          always() && hashFiles(steps.scan-sarif.outputs.path) != ''
       - name: Upload findings artifact
         uses: actions/upload-artifact@v4
         with:

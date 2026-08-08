@@ -1,11 +1,11 @@
 name: Security Scan
+
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   pull_request:
-    branches: [main]
-permissions:
-  contents: read
+    branches: [ main ]
+
 jobs:
   gitleaks:
     runs-on: ubuntu-latest
