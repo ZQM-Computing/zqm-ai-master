@@ -16,8 +16,8 @@ jobs:
   scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.11'
       - name: Install scanner
@@ -30,10 +30,13 @@ jobs:
           python snyk_replacement.py             --repo ${{ github.repository }}             --output both             --pr ${{ github.event.pull_request.number || 0 }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set timestamp
+        id: timestamp
+        run: echo "timestamp=$(date -u +%Y%m%dT%H%M%SZ)" >> "$GITHUB_OUTPUT"
       - name: Upload SARIF
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: .zqm-security-reports/${{ github.repository }}/$(date -u +%Y%m%dT%H%M%SZ)-results.sarif
+          sarif_file: .zqm-security-reports/${{ github.repository }}/${{ steps.timestamp.outputs.timestamp }}-results.sarif
         if: always()
       - name: Upload findings artifact
         uses: actions/upload-artifact@v4
