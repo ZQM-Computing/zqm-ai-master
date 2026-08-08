@@ -11,10 +11,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - run: pip install -r requirements.txt
@@ -30,3 +29,6 @@ jobs:
         continue-on-error: true
         run: |
           python scripts/full_enumeration_tests.py || echo "Integration tests require running service"
+          if [ -d tests ]; then pytest tests/ || true; fi
+          if [ -d test ]; then pytest test/ || true; fi
+          if [ -f pytest.ini ]; then pytest || true; fi
