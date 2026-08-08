@@ -719,6 +719,7 @@ class VoidCouncil:
             }
 
         applied = 0
+        finding_statuses: list[dict[str, Any]] = []
         if auto_apply and findings:
             try:
                 from app.orchestrator import self_expand, self_improve
@@ -727,9 +728,17 @@ class VoidCouncil:
                     blob = "\n".join(f["finding"] for f in novel)
                     p9 = await self_improve.scan_and_improve(self)
                     applied += len(p9.get("actions", []))
+                    for finding in novel:
+                        finding_statuses.append(await self._apply_finding(finding))
                     await self_expand.process_findings(self, blob)
             except Exception as exc:
                 log.debug("auto-apply skipped", error=str(exc))
+                finding_statuses.append({
+                    "status": "failed",
+                    "action": "batch",
+                    "finding_id": "batch",
+                    "error": str(exc),
+                })
 
         # Build action plan for returned findings
         action_plan = await self.action_planner(findings)
@@ -746,6 +755,7 @@ class VoidCouncil:
             "scribe": current_scribe,
             "panel": [a.name for a in panel],
             "findings": findings,
+            "finding_statuses": finding_statuses,
             "high_confidence": len(high_confidence),
             "applied": applied,
             "quorum_met": len(panel) >= quorum,
