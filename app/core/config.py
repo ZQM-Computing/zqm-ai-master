@@ -149,10 +149,10 @@ class Settings(BaseSettings):
     }
 
     # ── ZQM FLATSPACE ──────────────────────────────────────────────────────────────
-    flatspace_endpoint: str = "http://192.168.1.228:8808/api/flatspace/store"
-    flatspace_pollen_store: str = "http://192.168.1.228:8808/api/flatspace/pollen"
-    flatspace_bit_garden: str = "http://192.168.1.228:8808/api/flatspace/bitgarden"
-    flatspace_wax_cell: str = "http://192.168.1.228:8808/api/flatspace/waxcell"
+    flatspace_endpoint: str = "http://192.168.1.225:8808/api/flatspace/store"
+    flatspace_pollen_store: str = "http://192.168.1.225:8808/api/flatspace/pollen"
+    flatspace_bit_garden: str = "http://192.168.1.225:8808/api/flatspace/bitgarden"
+    flatspace_wax_cell: str = "http://192.168.1.225:8808/api/flatspace/waxcell"
 
     # ── ZQM Observability ─────────────────────────────────────────────────────
     observability_endpoint: str = "http://127.0.0.1:8808/api/observability/metrics"

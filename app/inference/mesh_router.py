@@ -16,7 +16,8 @@ from typing import Any, Dict, List, Optional
 
 
 MESH_NODES = [
-    {"id": "n1", "ip": "192.168.1.218", "port": 8808},
+    {"id": "n1", "ip": "192.168.1.224", "port": 8808},
+    {"id": "n2", "ip": "192.168.1.31", "port": 8808},
     {"id": "n3", "ip": "192.168.1.78", "port": 8808},
     {"id": "n4", "ip": "192.168.1.228", "port": 8808},
 ]
@@ -35,14 +36,13 @@ def _exclude_stale_sync_paths() -> None:
     os.environ.setdefault("ZQM_IGNORE_ONEDRIVE_SYNC", "1")
 
 
-# Authoritative IP map from N1 control plane /nodes endpoint, reconciled with
-# live ARP/SSH probes from N4 on 2026-08-07.
+# Authoritative IP map from LAN sweep and live SSH/health probes on 2026-08-08.
+# Compute nodes run The Void / Ollama; garden nodes are Synology/Noon storage.
 NODE_IP_MAP = {
-    "N1": "192.168.1.218",
-    "N2": "192.168.1.196",
+    "N1": "192.168.1.224",
+    "N2": "192.168.1.31",
     "N3": "192.168.1.78",
     "N4": "192.168.1.228",
-    "N4TABLE": "192.168.1.242",
 }
 
 

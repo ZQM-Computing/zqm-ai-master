@@ -23,11 +23,11 @@ from app.core.logger import get_logger
 
 log = get_logger("mesh_ollama")
 
-# Default mesh topology: LOCAL first, then N4-local, N3, N1, N2.
+# Default mesh topology: N2, N3, N4 are compute nodes with Ollama.
+# N1 is a management/gateway node without Ollama.
 DEFAULT_BACKENDS: List[Dict[str, Any]] = [
-    {"name": "N3", "url": "http://192.168.1.78:11434", "local": False},
-    {"name": "N1", "url": "http://192.168.1.224:11434", "local": False},
     {"name": "N2", "url": "http://192.168.1.31:11434", "local": False},
+    {"name": "N3", "url": "http://192.168.1.78:11434", "local": False},
     {"name": "N4", "url": "http://192.168.1.228:11434", "local": False},
 ]
 
