@@ -9,35 +9,44 @@ def test_agent_type_enum():
     assert AgentType.NLP == "nlp"
     assert AgentType.REASONING == "reasoning"
     assert AgentType.SYNTHESIS == "synthesis"
+    assert AgentType.QUANTUM == "quantum"
+    assert AgentType.GARDEN == "garden"
 
 
 def test_agent_creation():
     """Agent model should validate required fields."""
-    from app.models.agent import Agent
-    a = Agent(id="agent-001", name="Test Agent", type="nlp", status="idle")
-    assert a.id == "agent-001"
-    assert a.type.value == "nlp"
+    from app.models.agent import Agent, AgentStatus
+    a = Agent(
+        agent_id="agent-001",
+        name="Test Agent",
+        agent_type="nlp",
+        status=AgentStatus.IDLE,
+    )
+    assert a.agent_id == "agent-001"
+    assert a.agent_type.value == "nlp"
+    assert a.status == AgentStatus.IDLE
+    assert a.is_available is True
 
 
-def test_agent_missing_id():
-    """Agent model should reject missing id."""
+def test_agent_missing_agent_id():
+    """Agent model should reject missing agent_id."""
     from app.models.agent import Agent
     with pytest.raises(ValidationError):
-        Agent(name="Test", type="nlp", status="idle")
+        Agent(name="Test", agent_type="nlp")
 
 
 def test_agent_invalid_type():
-    """Agent model should reject invalid type."""
+    """Agent model should reject invalid agent_type."""
     from app.models.agent import Agent
     with pytest.raises(ValidationError):
-        Agent(id="a1", name="Test", type="invalid_type", status="idle")
+        Agent(agent_id="a1", name="Test", agent_type="invalid_type")
 
 
 def test_response_model():
     """ZQM_AIResponse model should validate structure."""
     from app.models.response import ZQM_AIResponse
-    r = ZQM_AIResponse(status="success", data={"key": "value"})
-    assert r.status == "success"
+    r = ZQM_AIResponse(success=True, data={"key": "value"})
+    assert r.success is True
     assert r.data["key"] == "value"
 
 
