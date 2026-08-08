@@ -3,7 +3,7 @@
 ## Default Brand
 - Product: The Void AI Orchestration System
 - Owner: ZQM Computing LLC
-- Support: admin@zqmlabs.com
+- Support: zqmcomputing@gmail.com
 - Portal docs: /docs
 
 ## Customer White Label

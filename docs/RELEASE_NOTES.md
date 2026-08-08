@@ -16,4 +16,4 @@
 4. Run `scripts\\verify_install.ps1`
 
 ## Support
-- Email: admin@zqmlabs.com
+- Email: zqmcomputing@gmail.com

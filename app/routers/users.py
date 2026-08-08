@@ -250,7 +250,7 @@ def _seed_default_admin() -> None:
     _users[admin_id] = UserRecord(
         user_id=admin_id,
         username="admin",
-        email="admin@zqmlabs.com",
+        email="zqmcomputing@gmail.com",
         roles=["admin", "user"],
         hashed_password=hash_password(os.getenv("ZQM_ADMIN_PASSWORD", "zqm-ai-admin")),
     )

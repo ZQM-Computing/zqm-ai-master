@@ -20,5 +20,5 @@
 - Tokens expire after 24 hours by default
 
 ## Support
-- Contact: admin@zqmlabs.com
+- Contact: zqmcomputing@gmail.com
 - Include deployment ID, logs/, and redacted `.env` when reporting issues

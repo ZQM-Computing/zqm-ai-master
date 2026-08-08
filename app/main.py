@@ -156,7 +156,7 @@ app = FastAPI(
     contact={
         "name": "ZQM Computing LLC",
         "url": "https://zqmlabs.com",
-        "email": "admin@zqmlabs.com",
+        "email": "zqmcomputing@gmail.com",
     },
     license_info={
         "name": "Proprietary — ZQM Computing LLC",

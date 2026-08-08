@@ -1,7 +1,7 @@
 param(
     [string]$EnvFile = "C:\Void\TheVoid\.env",
     [string]$CustomerName = "Customer",
-    [string]$SupportEmail = "admin@zqmlabs.com"
+    [string]$SupportEmail = "zqmcomputing@gmail.com"
 )
 $ErrorActionPreference='SilentlyContinue'
 if (-not (Test-Path $EnvFile)) { New-Item -ItemType File -Path $EnvFile | Out-Null }

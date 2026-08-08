@@ -26,7 +26,7 @@ class BrandingLayer:
         self.profile = BrandProfile(
             product_name=os.getenv("BRAND_PRODUCT_NAME", "The Void AI Orchestration System"),
             company_name=os.getenv("BRAND_COMPANY_NAME", os.getenv("CUSTOMER_NAME", "Customer")),
-            support_email=os.getenv("BRAND_SUPPORT_EMAIL", "admin@zqmlabs.com"),
+            support_email=os.getenv("BRAND_SUPPORT_EMAIL", "zqmcomputing@gmail.com"),
             portal_url=os.getenv("BRAND_PORTAL_URL", "http://localhost:8808/docs"),
             theme={
                 "primary": os.getenv("BRAND_PRIMARY_COLOR", "#0a0e17"),

@@ -21,5 +21,5 @@
 - JWT tokens are valid for 24 hours by default.
 
 ## Support
-- Email: admin@zqmlabs.com
+- Email: zqmcomputing@gmail.com
 - Include node ID, logs/, and .env-safe redacted config when reporting issues.

@@ -23,7 +23,7 @@ router = APIRouter(prefix="/api/support", tags=["Support"])
 async def support_status() -> JSONResponse:
     return JSONResponse({
         "product": os.getenv("BRAND_PRODUCT_NAME", "The Void AI Orchestration System"),
-        "support_email": os.getenv("BRAND_SUPPORT_EMAIL", "admin@zqmlabs.com"),
+        "support_email": os.getenv("BRAND_SUPPORT_EMAIL", "zqmcomputing@gmail.com"),
         "docs_url": os.getenv("BRAND_PORTAL_URL", "http://localhost:8808/docs"),
     })
 

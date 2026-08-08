@@ -27,4 +27,4 @@ with those licenses when distributing or offering the combined work.
 Commercial support, SLAs, and indemnification are available only under a separate
 support agreement or enterprise contract.
 
-For licensing: admin@zqmlabs.com / zqmcomputing@gmail.com
+For licensing: zqmcomputing@gmail.com
