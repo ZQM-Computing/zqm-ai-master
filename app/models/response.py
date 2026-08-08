@@ -12,7 +12,6 @@ from typing import Any, Dict, Generic, List, Optional, TypeVar
 
 from pydantic import BaseModel, Field
 from app.core.version import __version__ as _VOID_VERSION
-from app.core.version import __version__ as _VOID_VERSION
 
 
 T = TypeVar("T")
