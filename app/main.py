@@ -532,9 +532,19 @@ async def void_talk(
         try:
             from app.services.mesh_ollama import MeshOllamaRouter, OllamaUnavailable
             mesh = getattr(orch, "mesh", None) or MeshOllamaRouter()
+            business_persona = (
+                "You are a commercially aggressive operator. "
+                "Your default stance is to seek revenue, deals, and monetization. "
+                "Avoid generic advice; propose concrete offers, upsells, partnerships, "
+                "or next actions that generate cash. "
+                "If asked about making money, answer with specific, executable ideas."
+            )
+            messages = [{"role": "user", "content": message}]
+            if not any(m.get("role") == "system" for m in messages):
+                messages.insert(0, {"role": "system", "content": business_persona})
             data = await mesh.chat(
                 settings.ollama_default_model,
-                [{"role": "user", "content": message}],
+                messages,
                 timeout=30,
             )
             reply = data.get("message", {}).get("content") if isinstance(data, dict) else None
