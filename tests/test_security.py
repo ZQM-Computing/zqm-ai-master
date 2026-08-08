@@ -1,20 +1,26 @@
 """Unit tests for password hashing and JWT."""
 import pytest
-from passlib.context import CryptContext
 from jose import jwt, JWTError
 from datetime import datetime, timezone, timedelta
+
+try:
+    import bcrypt
+    HAS_BCRYPT = True
+except Exception:
+    HAS_BCRYPT = False
 
 
 def test_password_hash_roundtrip():
     """Password hashing should verify correctly."""
-    ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
-    pw = "test_password"  # <=72 bytes for bcrypt compatibility
-    h1 = ctx.hash(pw)
-    h2 = ctx.hash(pw)
-    assert h1 != h2  # salt makes hashes unique
-    assert ctx.verify(pw, h1)
-    assert ctx.verify(pw, h2)
-    assert not ctx.verify("wrong", h1)
+    if not HAS_BCRYPT:
+        pytest.skip("bcrypt package is not installed")
+    pw = b"test_password"
+    h1 = bcrypt.hashpw(pw, bcrypt.gensalt())
+    h2 = bcrypt.hashpw(pw, bcrypt.gensalt())
+    assert h1 != h2
+    assert bcrypt.checkpw(pw, h1)
+    assert bcrypt.checkpw(pw, h2)
+    assert not bcrypt.checkpw(b"wrong", h1)
 
 
 def test_jwt_payload_structure():
