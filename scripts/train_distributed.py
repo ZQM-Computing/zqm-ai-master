@@ -35,7 +35,7 @@ def discover_live_nodes() -> list[dict[str, Any]]:
     live = []
     for node in MESH_NODES:
         resp = _request(f"http://{node['ip']}:{node['port']}/healthz", timeout=5)
-        if resp.get("status") == "ok" or (not resp.get("_http_status") and not resp.get("_error")) or "_http_status" not in resp and "_error" not in resp:
+        if resp.get("status") == "ok" or (not resp.get("_http_status") and not resp.get("_error")) or ("_http_status" not in resp and "_error" not in resp):
             live.append(node)
     return live
 

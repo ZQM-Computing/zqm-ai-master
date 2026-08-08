@@ -114,7 +114,7 @@ async def _rerank_results(
     """Stage-2 rerank using configured embedding backend, with fallback policy."""
     if not results:
         return []
-    if not os.getenv("RAG_RERANK_ENABLED", "true").lower() in ("1", "true", "yes"):
+    if os.getenv("RAG_RERANK_ENABLED", "true").lower() not in ("1", "true", "yes"):
         return results[: max(1, limit)]
 
     query_vec = _embed_text(query)
