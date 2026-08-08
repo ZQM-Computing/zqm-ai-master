@@ -15,6 +15,16 @@
 5. Start the app service with NSSM or `python -m uvicorn app.main:app --app-dir . --host 0.0.0.0 --port 8808`.
 6. Visit `http://localhost:8808/healthz` to verify.
 
+## CI/CD Artifacts
+GitHub Actions builds release artifacts on tag push:
+- `dist/**` contains packaged application artifacts from `scripts/build_release.py`
+- `dist/install/**` contains Windows service installer from `scripts/install_service.ps1`
+
+Install an extracted release with:
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\install_service.ps1 -InstallDir "C:\Void\TheVoid"
+```
+
 ## Authentication
 - Default login route: `POST /api/users/login`
 - Customer-specific credentials are issued during onboarding.

@@ -31,8 +31,52 @@ logger = logging.getLogger("zqm_ai.webhook")
 router = APIRouter(prefix="/api/webhook", tags=["webhooks"])
 
 # ---------------------------------------------------------------------------
-# Config
+# Moltbook webhook
 # ---------------------------------------------------------------------------
+
+
+class MoltbookWebhook(BaseModel):
+    event: Optional[str] = None
+    resource: Optional[Dict[str, Any]] = None
+    payload: Optional[Dict[str, Any]] = None
+
+
+def _verify_moltbook_signature(body: bytes, signature: Optional[str], secret: str) -> bool:
+    if not secret or not signature:
+        return False
+    expected = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, signature)
+
+
+@router.post("/moltbook", summary="Moltbook webhook receiver")
+async def moltbook_webhook(
+    request: Request,
+    x_moltbook_signature: Optional[str] = Header(None, alias="X-Moltbook-Signature"),
+    x_moltbook_event: Optional[str] = Header(None, alias="X-Moltbook-Event"),
+):
+    body = await request.body()
+    secret = os.getenv("MOLTBOOK_WEBHOOK_SECRET", "")
+    if secret:
+        if not x_moltbook_signature:
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Missing Moltbook signature")
+        if not _verify_moltbook_signature(body, x_moltbook_signature, secret):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Invalid Moltbook signature")
+
+    try:
+        payload = json.loads(body)
+    except Exception:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid JSON body")
+
+    event = x_moltbook_event or payload.get("event") or payload.get("type") or "unknown"
+    data = {
+        "summary": f"Moltbook event: {event}",
+        "event": event,
+        "payload": payload,
+        "resource": payload.get("resource"),
+    }
+    result = await _ingest_webhook_event("moltbook", event, data)
+    return {"status": "received", "event": event, "result": result}
+
 
 ZQM_INTERNAL_KEY = os.getenv("ZQM_INTERNAL_KEY", "")
 if not ZQM_INTERNAL_KEY:
@@ -624,7 +668,19 @@ async def webhook_info():
                 "path": "/api/webhook/dealwork",
                 "method": "POST",
                 "description": "Dealwork.ai marketplace events",
-                "auth": "none",
+                "auth": "HMAC-SHA256",
+            },
+            {
+                "path": "/api/webhook/moltbook",
+                "method": "POST",
+                "description": "Moltbook webhook events",
+                "auth": "HMAC-SHA256 if MOLTBOOK_WEBHOOK_SECRET configured",
+            },
+            {
+                "path": "/api/webhooks/moltbook",
+                "method": "POST",
+                "description": "Moltbook alt webhook mount",
+                "auth": "HMAC-SHA256 if MOLTBOOK_WEBHOOK_SECRET configured",
             },
         ],
     }

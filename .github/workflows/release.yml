@@ -14,8 +14,12 @@ jobs:
           python-version: '3.12'
       - run: pip install -r requirements.txt
       - run: python scripts/build_release.py
+      - name: Build Windows service package
+        run: powershell -File scripts/install_service.ps1 -InstallDir dist\install
       - uses: actions/upload-artifact@v4
         with:
           name: release-dist
-          path: dist/**
+          path: |
+            dist/**
+            dist/install/**
           retention-days: 30

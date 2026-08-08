@@ -1,0 +1,16 @@
+groups:
+  - name: zqm_local_stack
+    interval: 15s
+    rules:
+      - id: up
+        expr: up == 0
+        labels:
+          severity: critical
+        annotations:
+          summary: "Down {{ $labels.job }} on {{ $labels.instance }}"
+      - id: scrape_lag
+        expr: scrape_duration_seconds > 2
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow scrape {{ $labels.job }} {{ $labels.instance }}"

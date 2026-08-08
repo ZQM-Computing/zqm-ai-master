@@ -15,10 +15,15 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r requirements.txt
-      - run: python -m py_compile app/**/*.py
+      - name: Syntax check app
+        run: python -m py_compile app/**/*.py
+      - name: Syntax check scripts
+        run: python -m py_compile scripts/*.py
       - name: Run unit tests
+        if: '!cancelled()'
         run: python -m pytest tests/ -v
       - name: Run integration tests
+        if: '!cancelled()'
         continue-on-error: true
         run: |
           python scripts/full_enumeration_tests.py || echo "Integration tests require running service"

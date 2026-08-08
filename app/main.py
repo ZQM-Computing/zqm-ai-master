@@ -30,7 +30,7 @@ from app.models.response import ErrorResponse
 from app.services.mesh_ollama import OllamaUnavailable
 from app.orchestrator.zqm_ai_orchestrator import ZQM_AIOrchestrator
 from app.routers import (
-    dashboard, events, garden, info, internal, observability, permissions, predict, process, settings as settings_router,
+    dashboard, events, garden, info, internal, moltbook, observability, permissions, predict, process, settings as settings_router,
     status as status_router, train, users, webhooks, flatspace, falsification, sso,
 )
 from app.routers import mesh_probe, mesh_ops, quantum_llm_bridge, void_council
@@ -919,6 +919,7 @@ app.include_router(quantum_llm_bridge.router)
 app.include_router(mesh_probe.router)
 app.include_router(internal.router)
 app.include_router(observability.router)
+app.include_router(moltbook.router)
 app.include_router(void_council.router)
 app.include_router(mesh_ops.router)
 from app.routers.rag import router as rag_router

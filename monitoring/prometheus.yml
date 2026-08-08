@@ -1,11 +1,76 @@
-
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
+  external_labels:
+    cluster: "zqm-void-n4"
+    node: "N4"
 
 scrape_configs:
   - job_name: "void"
+    metrics_path: "/api/observability/metrics"
     static_configs:
       - targets: ["host.docker.internal:8808"]
         labels:
           node: "N4"
+          service: "void"
+
+  - job_name: "meilisearch"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["host.docker.internal:7701"]
+        labels:
+          node: "N4"
+          service: "meilisearch"
+
+  - job_name: "chroma"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["host.docker.internal:8001"]
+        labels:
+          node: "N4"
+          service: "chroma"
+
+  - job_name: "searxng"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["host.docker.internal:8080"]
+        labels:
+          node: "N4"
+          service: "searxng"
+
+  - job_name: "ollama"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["host.docker.internal:11434"]
+        labels:
+          node: "N4"
+          service: "ollama"
+
+  - job_name: "redis"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["host.docker.internal:6379"]
+        labels:
+          node: "N4"
+          service: "redis"
+    # NOTE: Redis does not expose /metrics by default.
+    # Enable only if an external exporter is listening on 6379/metrics,
+    # or if you run a sidecar exporter and change this target.
+
+  - job_name: "node-exporter"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["host.docker.internal:9100"]
+        labels:
+          node: "N4"
+          service: "node"
+    # NOTE: Enable when node-exporter is started.
+
+  - job_name: "cadvisor"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["host.docker.internal:8082"]
+        labels:
+          node: "N4"
+          service: "cadvisor"
+    # NOTE: Enable when cAdvisor is started.
