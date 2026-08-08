@@ -67,11 +67,15 @@ def _https_json_get(url: str, timeout: float = 4.0) -> dict[str, Any] | None:
     return None
 
 
-def _local_api(base_path: str = "http://127.0.0.1:8810") -> dict[str, Any] | None:
+def _local_api(base_path: str | None = None) -> dict[str, Any] | None:
+    if base_path is None:
+        base_path = "http://127.0.0.1:8808"
     return _json_get(f"{base_path}/api/healthz", timeout=6.0)
 
 
-def _garden_evidence(base_path: str = "http://127.0.0.1:8810") -> list[str]:
+def _garden_evidence(base_path: str | None = None) -> list[str]:
+    if base_path is None:
+        base_path = "http://127.0.0.1:8808"
     out: list[str] = []
     data = _json_get(f"{base_path}/api/garden/health", timeout=6.0)
     if data is None:
@@ -81,7 +85,9 @@ def _garden_evidence(base_path: str = "http://127.0.0.1:8810") -> list[str]:
     return out
 
 
-def _mesh_evidence(base_path: str = "http://127.0.0.1:8810") -> list[str]:
+def _mesh_evidence(base_path: str | None = None) -> list[str]:
+    if base_path is None:
+        base_path = "http://127.0.0.1:8808"
     out: list[str] = []
     data = _json_get(f"{base_path}/api/mesh/nodes/health", timeout=6.0)
     if data is None:
@@ -94,7 +100,9 @@ def _mesh_evidence(base_path: str = "http://127.0.0.1:8810") -> list[str]:
     return out
 
 
-def _status_code_evidence(base_path: str = "http://127.0.0.1:8810") -> list[str]:
+def _status_code_evidence(base_path: str | None = None) -> list[str]:
+    if base_path is None:
+        base_path = "http://127.0.0.1:8808"
     out: list[str] = []
     for path in ["/api/status", "/api/garden/metrics"]:
         url = f"{base_path}{path}"
@@ -125,7 +133,9 @@ def _codebase_evidence() -> list[str]:
     return out
 
 
-def gather_council_evidence(base_path: str = "http://127.0.0.1:8810") -> list[str]:
+def gather_council_evidence(base_path: str | None = None) -> list[str]:
+    if base_path is None:
+        base_path = "http://127.0.0.1:8808"
     parts: list[str] = []
     try:
         parts.append("Live system evidence:")
@@ -337,11 +347,12 @@ class VoidCouncil:
     def __init__(
         self,
         registry: Any,
-        settings: Any,
+        settings: Any | None = None,
         max_history: int = 200,
         history_path: str | None = None,
     ) -> None:
         self.registry = registry
+        self._settings = settings
         self.settings = settings
         self._history: list[str] = []
         self._max_history = max(1, max_history)
@@ -391,6 +402,14 @@ class VoidCouncil:
                 }, ttl=600)
             except Exception:
                 pass
+
+    def _default_evidence_base_path(self) -> str:
+        settings = getattr(self, "_settings", None)
+        if settings is None:
+            return "http://127.0.0.1:8808"
+        host = getattr(settings, "host", None) or "127.0.0.1"
+        port = getattr(settings, "port", 8808)
+        return f"http://{host}:{port}"
 
     def _mounted_route_summary(self) -> str:
         app = getattr(self, "_app", None)
@@ -731,6 +750,10 @@ class VoidCouncil:
                     for finding in novel:
                         finding_statuses.append(await self._apply_finding(finding))
                     await self_expand.process_findings(self, blob)
+                    self._applied_count += applied
+                    self._applied_count += sum(
+                        1 for s in finding_statuses if s.get("status") == "applied"
+                    )
             except Exception as exc:
                 log.debug("auto-apply skipped", error=str(exc))
                 finding_statuses.append({
@@ -739,9 +762,6 @@ class VoidCouncil:
                     "finding_id": "batch",
                     "error": str(exc),
                 })
-
-        # Build action plan for returned findings
-        action_plan = await self.action_planner(findings)
 
         self._session_count += 1
         high_confidence = [f for f in findings if f.get("confidence", 0.0) >= min_confidence]
