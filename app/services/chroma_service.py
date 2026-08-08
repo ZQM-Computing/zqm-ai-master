@@ -7,7 +7,7 @@ Returns empty list when Chroma is not configured or unavailable.
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.core.config import settings
 from app.core.logger import get_logger
@@ -22,7 +22,7 @@ def _chroma_url(path: str) -> str:
     return f"{base}{path}"
 
 
-def search(query: str, collection: Optional[str] = None, limit: int = 10) -> List[Dict[str, Any]]:
+def search(query: str, collection: str | None = None, limit: int = 10) -> list[dict[str, Any]]:
     """Query Chroma collection by embedding text and returning top hits."""
     if not settings.chroma_enabled:
         return []

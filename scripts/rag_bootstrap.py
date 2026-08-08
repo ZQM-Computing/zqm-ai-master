@@ -12,15 +12,13 @@ Defaults are local-only; no external provider calls unless explicitly enabled.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
-import hashlib
-import urllib.parse
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import requests
-from requests.exceptions import HTTPError
 
 try:
     import sqlite3
@@ -37,13 +35,13 @@ class RAGConfig:
     ollama_model: str = "all-minilm:latest"
     searxng_url: str = "http://127.0.0.1:8080/search"
     flatspace_db_path: str = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "app", "flatspace_local.db")
-    flatspace_http: Optional[str] = None  # e.g. http://127.0.0.1:8808/api/flatspace
+    flatspace_http: str | None = None  # e.g. http://127.0.0.1:8808/api/flatspace
 
 
 # ── Meilisearch helpers ─────────────────────────────────────────────────────
 
 
-def _meili_headers(cfg: RAGConfig) -> Dict[str, str]:
+def _meili_headers(cfg: RAGConfig) -> dict[str, str]:
     return {"Authorization": f"Bearer {cfg.meili_key}", "Content-Type": "application/json"}
 
 
@@ -67,7 +65,7 @@ def clear_meili_index(cfg: RAGConfig) -> None:
     ).raise_for_status()
 
 
-def upsert_meili_docs(cfg: RAGConfig, docs: List[Dict[str, Any]]) -> None:
+def upsert_meili_docs(cfg: RAGConfig, docs: list[dict[str, Any]]) -> None:
     if not docs:
         return
     # Upsert by primaryKey in batches of 200
@@ -86,7 +84,7 @@ def upsert_meili_docs(cfg: RAGConfig, docs: List[Dict[str, Any]]) -> None:
 # ── Embeddings ─────────────────────────────────────────────────────────────
 
 
-def embed_text(cfg: RAGConfig, text: str) -> Optional[List[float]]:
+def embed_text(cfg: RAGConfig, text: str) -> list[float] | None:
     try:
         r = requests.post(
             cfg.ollama_embed_url,
@@ -101,7 +99,7 @@ def embed_text(cfg: RAGConfig, text: str) -> Optional[List[float]]:
         pass
     # Deterministic fallback so search affordance remains.
     h = hashlib.sha256(text.encode("utf-8", errors="replace")).digest()
-    out: List[float] = []
+    out: list[float] = []
     for b in h:
         out.append((b / 127.5) - 1.0)
     while len(out) < 384:
@@ -116,10 +114,10 @@ def embed_text(cfg: RAGConfig, text: str) -> Optional[List[float]]:
 # ── Flatspace local ingestion ──────────────────────────────────────────────
 
 
-def iter_local_store_docs(cfg: RAGConfig, limit: int = 500) -> List[Dict[str, Any]]:
+def iter_local_store_docs(cfg: RAGConfig, limit: int = 500) -> list[dict[str, Any]]:
     if not sqlite3 or not os.path.exists(cfg.flatspace_db_path):
         return []
-    docs: List[Dict[str, Any]] = []
+    docs: list[dict[str, Any]] = []
     try:
         conn = sqlite3.connect(cfg.flatspace_db_path)
         conn.row_factory = sqlite3.Row
@@ -152,8 +150,8 @@ def iter_local_store_docs(cfg: RAGConfig, limit: int = 500) -> List[Dict[str, An
     return docs
 
 
-def iter_local_markdown(root: str = r"C:\Void\ZQM-AI-Master") -> List[Dict[str, Any]]:
-    docs: List[Dict[str, Any]] = []
+def iter_local_markdown(root: str = r"C:\Void\ZQM-AI-Master") -> list[dict[str, Any]]:
+    docs: list[dict[str, Any]] = []
     if not os.path.isdir(root):
         return docs
     for dirpath, _, filenames in os.walk(root):
@@ -181,7 +179,7 @@ def iter_local_markdown(root: str = r"C:\Void\ZQM-AI-Master") -> List[Dict[str, 
 # ── SearXNG augmentation ──────────────────────────────────────────────────
 
 
-def searxng_search(cfg: RAGConfig, query: str, limit: int = 5) -> List[Dict[str, Any]]:
+def searxng_search(cfg: RAGConfig, query: str, limit: int = 5) -> list[dict[str, Any]]:
     try:
         r = requests.get(
             cfg.searxng_url,
@@ -190,7 +188,7 @@ def searxng_search(cfg: RAGConfig, query: str, limit: int = 5) -> List[Dict[str,
         )
         r.raise_for_status()
         data = r.json()
-        results: List[Dict[str, Any]] = []
+        results: list[dict[str, Any]] = []
         for item in data.get("results", [])[: limit]:
             results.append({
                 "title": item.get("title"),
@@ -205,8 +203,8 @@ def searxng_search(cfg: RAGConfig, query: str, limit: int = 5) -> List[Dict[str,
         return []
 
 
-def build_augmented_context(query: str, local_hits: List[Dict[str, Any]], web_hits: List[Dict[str, Any]], max_items: int = 8) -> Dict[str, Any]:
-    merged: List[Dict[str, Any]] = []
+def build_augmented_context(query: str, local_hits: list[dict[str, Any]], web_hits: list[dict[str, Any]], max_items: int = 8) -> dict[str, Any]:
+    merged: list[dict[str, Any]] = []
     for r in local_hits[: max_items]:
         val = r.get("value") if isinstance(r.get("value"), dict) else {"text": str(r.get("value"))}
         text = val.get("body") or val.get("text") or val.get("content") or json.dumps(val, default=str)
@@ -227,8 +225,8 @@ def build_augmented_context(query: str, local_hits: List[Dict[str, Any]], web_hi
 # ── Main bootstrap flow ────────────────────────────────────────────────────
 
 
-def bootstrap(cfg: RAGConfig, rebuild: bool = False, seed_query: Optional[str] = None, augment: bool = True) -> Dict[str, Any]:
-    report: Dict[str, Any] = {"meili": {}, "local_indexed": 0, "docs_indexed": 0, "search_demo": None}
+def bootstrap(cfg: RAGConfig, rebuild: bool = False, seed_query: str | None = None, augment: bool = True) -> dict[str, Any]:
+    report: dict[str, Any] = {"meili": {}, "local_indexed": 0, "docs_indexed": 0, "search_demo": None}
 
     # 1. Meilisearch index ready
     try:
@@ -239,7 +237,7 @@ def bootstrap(cfg: RAGConfig, rebuild: bool = False, seed_query: Optional[str] =
         return report
 
     # 2. Load local docs
-    docs: List[Dict[str, Any]] = []
+    docs: list[dict[str, Any]] = []
     docs.extend(iter_local_store_docs(cfg))
     docs.extend(iter_local_markdown())
 
@@ -251,7 +249,7 @@ def bootstrap(cfg: RAGConfig, rebuild: bool = False, seed_query: Optional[str] =
 
     # 3. Embed + index
     seen_ids: set[str] = set()
-    to_index: List[Dict[str, Any]] = []
+    to_index: list[dict[str, Any]] = []
     for doc in docs:
         doc_id = doc.get("id") or hashlib.sha256(json.dumps(doc, sort_keys=True, default=str).encode()).hexdigest()[:40]
         if doc_id in seen_ids:
@@ -313,7 +311,7 @@ def bootstrap(cfg: RAGConfig, rebuild: bool = False, seed_query: Optional[str] =
 # ── Standalone search helper ──────────────────────────────────────────────
 
 
-def search_meili(cfg: RAGConfig, query: str, limit: int = 10) -> List[Dict[str, Any]]:
+def search_meili(cfg: RAGConfig, query: str, limit: int = 10) -> list[dict[str, Any]]:
     r = requests.post(
         f"{cfg.meili_url}/indexes/{cfg.meili_index}/search",
         headers=_meili_headers(cfg),

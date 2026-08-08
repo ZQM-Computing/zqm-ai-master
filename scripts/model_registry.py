@@ -5,14 +5,11 @@ Stores model metadata in JSON and tracks adapter/merged checkpoints.
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import shutil
 import time
-from dataclasses import dataclass, asdict
-from typing import Dict, List, Optional
-
+from dataclasses import asdict, dataclass
 
 REGISTRY_PATH = "models/registry.json"
 CHECKPOINT_ROOT = "models"
@@ -23,11 +20,11 @@ class ModelRecord:
     model_id: str
     base_model: str
     variant: str = "base"
-    adapter_dir: Optional[str] = None
-    merged_dir: Optional[str] = None
+    adapter_dir: str | None = None
+    merged_dir: str | None = None
     created_at: str = ""
-    metrics: Dict[str, Any] = None  # type: ignore
-    tags: List[str] = None  # type: ignore
+    metrics: dict[str, Any] = None  # type: ignore
+    tags: list[str] = None  # type: ignore
     note: str = ""
 
     def __post_init__(self):
@@ -39,7 +36,7 @@ class ModelRecord:
             self.created_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
-def _load_registry() -> Dict[str, ModelRecord]:
+def _load_registry() -> dict[str, ModelRecord]:
     if not os.path.exists(REGISTRY_PATH):
         return {}
     with open(REGISTRY_PATH, "r", encoding="utf-8") as f:
@@ -50,7 +47,7 @@ def _load_registry() -> Dict[str, ModelRecord]:
     return out
 
 
-def _save_registry(reg: Dict[str, ModelRecord]) -> None:
+def _save_registry(reg: dict[str, ModelRecord]) -> None:
     os.makedirs(os.path.dirname(REGISTRY_PATH) or ".", exist_ok=True)
     with open(REGISTRY_PATH, "w", encoding="utf-8") as f:
         json.dump({k: asdict(v) for k, v in reg.items()}, f, indent=2)
@@ -60,10 +57,10 @@ def register_model(
     model_id: str,
     base_model: str,
     variant: str = "base",
-    adapter_dir: Optional[str] = None,
-    merged_dir: Optional[str] = None,
-    metrics: Optional[Dict[str, Any]] = None,
-    tags: Optional[List[str]] = None,
+    adapter_dir: str | None = None,
+    merged_dir: str | None = None,
+    metrics: dict[str, Any] | None = None,
+    tags: list[str] | None = None,
     note: str = "",
 ) -> ModelRecord:
     reg = _load_registry()
@@ -82,11 +79,11 @@ def register_model(
     return rec
 
 
-def list_models() -> List[ModelRecord]:
+def list_models() -> list[ModelRecord]:
     return list(_load_registry().values())
 
 
-def best_model(metric: str = "mmlu", higher_is_better: bool = True) -> Optional[ModelRecord]:
+def best_model(metric: str = "mmlu", higher_is_better: bool = True) -> ModelRecord | None:
     reg = list(_load_registry().values())
     scored = [r for r in reg if metric in (r.metrics or {})]
     if not scored:

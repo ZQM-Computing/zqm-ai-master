@@ -7,11 +7,10 @@ Exposes mesh-wide node/garden operations endpoints.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from app.core.config import settings
 from app.services.garden_service import GardenService
 from app.services.mesh_node_ops import MeshNodeOperations
 from app.services.synology_service import SynologyService
@@ -24,7 +23,7 @@ _synology = SynologyService()
 
 
 @router.get("/api/mesh/nodes/health")
-async def mesh_nodes_health() -> Dict[str, Any]:
+async def mesh_nodes_health() -> dict[str, Any]:
     """Return health snapshot for all configured mesh/garden nodes."""
     try:
         snapshot = await _node_ops.get_node_health_snapshot()
@@ -37,7 +36,7 @@ async def mesh_nodes_health() -> Dict[str, Any]:
 
 
 @router.get("/api/mesh/nodes/metrics")
-async def mesh_nodes_metrics() -> Dict[str, Any]:
+async def mesh_nodes_metrics() -> dict[str, Any]:
     """Aggregate metrics across all mesh/garden nodes."""
     try:
         return await _node_ops.collect_node_metrics()
@@ -46,7 +45,7 @@ async def mesh_nodes_metrics() -> Dict[str, Any]:
 
 
 @router.get("/api/mesh/nodes/best")
-async def mesh_best_node(gpu_required: bool = False) -> Dict[str, Any]:
+async def mesh_best_node(gpu_required: bool = False) -> dict[str, Any]:
     """Select the best available node by health + capability."""
     try:
         node = await _node_ops.select_best_node(gpu_required=gpu_required)
@@ -66,7 +65,7 @@ async def mesh_best_node(gpu_required: bool = False) -> Dict[str, Any]:
 
 
 @router.post("/api/mesh/nodes/promote")
-async def mesh_promote_backup() -> Dict[str, Any]:
+async def mesh_promote_backup() -> dict[str, Any]:
     """If primary is unhealthy, reroute coordination to a healthy backup."""
     try:
         result = await _node_ops.promote_backup_if_needed()
@@ -80,7 +79,7 @@ async def mesh_promote_backup() -> Dict[str, Any]:
 
 
 @router.get("/api/mesh/synology/info")
-async def mesh_synology_info() -> Dict[str, Any]:
+async def mesh_synology_info() -> dict[str, Any]:
     """Return DSM/system info for the Synology Garden fleet."""
     try:
         info = await _synology.get_node_system_info()

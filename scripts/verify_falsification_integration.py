@@ -1,7 +1,9 @@
 """
 Integration verification: simulate FastAPI app startup + router registration.
 """
-import sys, os
+import os
+import sys
+
 os.chdir(r'C:\Void\ZQM-AI-Master')
 sys.path.insert(0, r'C:\Void\ZQM-AI-Master')
 

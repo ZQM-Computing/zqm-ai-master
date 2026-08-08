@@ -9,7 +9,6 @@ and runs one-time initialization for local services.
 
 from __future__ import annotations
 
-import os
 import secrets
 import string
 from pathlib import Path

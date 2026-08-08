@@ -7,15 +7,10 @@ Consistent envelope for all API responses.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any, Dict, Generic, List, Optional, TypeVar
+from datetime import UTC, datetime
+from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, Field
-from app.core.version import __version__ as _VOID_VERSION
-from app.core.version import __version__ as _VOID_VERSION
-from app.core.version import __version__ as _VOID_VERSION
-from app.core.version import __version__ as _VOID_VERSION
-from app.core.version import __version__ as _VOID_VERSION
 
 from app.core.version import __version__ as _VOID_VERSION
 
@@ -31,12 +26,12 @@ class ZQM_AIResponse(BaseModel, Generic[T]):
     """
 
     success: bool = True
-    data: Optional[T] = None
-    message: Optional[str] = None
+    data: T | None = None
+    message: str | None = None
     zqm_ai_id: str = "ZQM-ZQM_AI-004"
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    request_id: Optional[str] = None
-    duration_ms: Optional[int] = None
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    request_id: str | None = None
+    duration_ms: int | None = None
     version: str = _VOID_VERSION
 
     @classmethod
@@ -44,9 +39,9 @@ class ZQM_AIResponse(BaseModel, Generic[T]):
         cls,
         data: Any = None,
         message: str = "Success",
-        request_id: Optional[str] = None,
-        duration_ms: Optional[int] = None,
-    ) -> "ZQM_AIResponse":
+        request_id: str | None = None,
+        duration_ms: int | None = None,
+    ) -> ZQM_AIResponse:
         return cls(
             success=True,
             data=data,
@@ -60,8 +55,8 @@ class ZQM_AIResponse(BaseModel, Generic[T]):
         cls,
         message: str = "An error occurred",
         data: Any = None,
-        request_id: Optional[str] = None,
-    ) -> "ZQM_AIResponse":
+        request_id: str | None = None,
+    ) -> ZQM_AIResponse:
         return cls(
             success=False,
             data=data,
@@ -75,8 +70,8 @@ class ErrorDetail(BaseModel):
 
     code: str
     message: str
-    field: Optional[str] = None
-    context: Optional[Dict[str, Any]] = None
+    field: str | None = None
+    context: dict[str, Any] | None = None
 
 
 class ErrorResponse(BaseModel):
@@ -84,33 +79,33 @@ class ErrorResponse(BaseModel):
 
     success: bool = False
     error: str
-    detail: Optional[str] = None
-    errors: List[ErrorDetail] = Field(default_factory=list)
+    detail: str | None = None
+    errors: list[ErrorDetail] = Field(default_factory=list)
     zqm_ai_id: str = "ZQM-ZQM_AI-004"
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    request_id: Optional[str] = None
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    request_id: str | None = None
 
 
 class PaginatedResponse(BaseModel, Generic[T]):
     """Paginated list response."""
 
     success: bool = True
-    items: List[T] = Field(default_factory=list)
+    items: list[T] = Field(default_factory=list)
     total: int = 0
     page: int = 1
     page_size: int = 20
     pages: int = 1
     zqm_ai_id: str = "ZQM-ZQM_AI-004"
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     @classmethod
     def of(
         cls,
-        items: List[Any],
+        items: list[Any],
         total: int,
         page: int = 1,
         page_size: int = 20,
-    ) -> "PaginatedResponse":
+    ) -> PaginatedResponse:
         import math
         return cls(
             items=items,
@@ -134,8 +129,8 @@ class HealthStatus(BaseModel):
     zqm_ai_id: str = "ZQM-ZQM_AI-004"
     version: str = _VOID_VERSION
     environment: str = "development"
-    uptime_seconds: Optional[float] = None
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    uptime_seconds: float | None = None
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # Component health
     database: str = "unknown"          # The Void's real datastore (FLATSPACE SQLite)
@@ -146,14 +141,14 @@ class HealthStatus(BaseModel):
     self_apply: str = "unknown"        # autonomy gate (core)
 
     # External optional dependencies, surfaced separately from core status.
-    external_services: Dict[str, str] = Field(default_factory=dict)
+    external_services: dict[str, str] = Field(default_factory=dict)
 
     # Stats
     active_tasks: int = 0
     total_agents: int = 0
     cache_size: int = 0
-    memory_mb: Optional[float] = None
-    cpu_percent: Optional[float] = None
+    memory_mb: float | None = None
+    cpu_percent: float | None = None
 
 
 class DashboardStats(BaseModel):
@@ -181,7 +176,7 @@ class DashboardStats(BaseModel):
     uptime_seconds: float = 0.0
     cache_hit_rate: float = 0.0
     garden_nodes_online: int = 0
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # Recent task history (restart-surviving, from FLATSPACE durable store)
-    recent_tasks: List[Dict[str, Any]] = []
+    recent_tasks: list[dict[str, Any]] = []

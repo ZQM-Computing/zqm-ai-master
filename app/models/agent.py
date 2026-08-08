@@ -7,12 +7,11 @@ Schemas for the The Void autonomous agent pool.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
-
 
 # ── Enumerations ──────────────────────────────────────────────────────────────
 
@@ -90,7 +89,7 @@ class AgentPerformanceMetrics(BaseModel):
     average_latency_ms: float = 0.0
     success_rate: float = 1.0
     efficiency_score: float = 1.0     # 0.0–1.0; drives agent selection weight
-    last_updated: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    last_updated: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     def update(self, success: bool, latency_ms: int, tokens: int = 0) -> None:
         """Incrementally update metrics after a task execution."""
@@ -111,9 +110,9 @@ class AgentPerformanceMetrics(BaseModel):
         # Efficiency score: weighted combination
         latency_score = max(0.0, 1.0 - (self.average_latency_ms / 30000))  # Penalize > 30s
         self.efficiency_score = (self.success_rate * 0.7) + (latency_score * 0.3)
-        self.last_updated = datetime.now(timezone.utc)
+        self.last_updated = datetime.now(UTC)
 
-    def update_calibration(self, confidence: Optional[float], verified: bool) -> Optional[float]:
+    def update_calibration(self, confidence: float | None, verified: bool) -> float | None:
         """Optionally record calibration; returns calibration_offset or None."""
         if confidence is None or not verified:
             return None
@@ -128,12 +127,12 @@ class Agent(BaseModel):
     name: str
     agent_type: AgentType
     status: AgentStatus = AgentStatus.IDLE
-    capabilities: List[AgentCapability] = Field(default_factory=list)
+    capabilities: list[AgentCapability] = Field(default_factory=list)
 
     # AI backend
     provider: str = "ollama"                # openai | anthropic | ollama
     model: str = "llama3.2"
-    system_prompt: Optional[str] = None
+    system_prompt: str | None = None
 
     # Resource limits
     max_concurrent: int = 5
@@ -144,15 +143,15 @@ class Agent(BaseModel):
     metrics: AgentPerformanceMetrics = Field(default_factory=AgentPerformanceMetrics)
 
     # Lifecycle
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    last_active: Optional[datetime] = None
-    garden_node: Optional[str] = None       # Which Garden node runs this agent
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    last_active: datetime | None = None
+    garden_node: str | None = None       # Which Garden node runs this agent
     queen: str = "Garden-0"
 
     # Metadata
-    family_key: Optional[str] = None
-    tags: List[str] = Field(default_factory=list)
-    config: Dict[str, Any] = Field(default_factory=dict)
+    family_key: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    config: dict[str, Any] = Field(default_factory=dict)
 
     @property
     def is_available(self) -> bool:
@@ -176,29 +175,29 @@ class AgentCreate(BaseModel):
 
     name: str
     agent_type: AgentType
-    capabilities: List[AgentCapability] = Field(default_factory=list)
+    capabilities: list[AgentCapability] = Field(default_factory=list)
     provider: str = "ollama"
     model: str = "llama3.2"
-    system_prompt: Optional[str] = None
+    system_prompt: str | None = None
     max_concurrent: int = 5
     priority_weight: float = 1.0
-    garden_node: Optional[str] = None
-    tags: List[str] = Field(default_factory=list)
-    config: Dict[str, Any] = Field(default_factory=dict)
-    family_key: Optional[str] = None
+    garden_node: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    config: dict[str, Any] = Field(default_factory=dict)
+    family_key: str | None = None
 
 
 
 class AgentUpdate(BaseModel):
     """Partial agent update."""
 
-    status: Optional[AgentStatus] = None
-    system_prompt: Optional[str] = None
-    max_concurrent: Optional[int] = None
-    priority_weight: Optional[float] = None
-    provider: Optional[str] = None
-    config: Optional[Dict[str, Any]] = None
-    tags: Optional[List[str]] = None
+    status: AgentStatus | None = None
+    system_prompt: str | None = None
+    max_concurrent: int | None = None
+    priority_weight: float | None = None
+    provider: str | None = None
+    config: dict[str, Any] | None = None
+    tags: list[str] | None = None
 
 
 class AgentSummary(BaseModel):
@@ -213,4 +212,4 @@ class AgentSummary(BaseModel):
     max_concurrent: int
     provider: str
     model: str
-    garden_node: Optional[str] = None
+    garden_node: str | None = None

@@ -13,10 +13,9 @@ Wired to the orchestrator's singleton at request.app.state.orchestrator.flatspac
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 
-from fastapi import APIRouter, Depends, Request, status
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, Request
 
 from app.core.security import get_current_token_payload, require_admin
 from app.models.response import ZQM_AIResponse
@@ -35,8 +34,8 @@ def _fs(request: Request):
 )
 async def store(
     request: Request,
-    body: Dict[str, Any],
-    auth: Dict[str, Any] = Depends(require_admin),
+    body: dict[str, Any],
+    auth: dict[str, Any] = Depends(require_admin),
 ) -> ZQM_AIResponse:
     fs = _fs(request)
     key = body.get("key")
@@ -59,8 +58,8 @@ async def store(
 )
 async def search(
     request: Request,
-    body: Dict[str, Any],
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    body: dict[str, Any],
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> ZQM_AIResponse:
     fs = _fs(request)
     results = await fs.search(
@@ -83,7 +82,7 @@ async def retrieve(
     key: str,
     request: Request,
     tier: str = "bitgarden",
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> ZQM_AIResponse:
     fs = _fs(request)
     value = await fs.retrieve(key, tier=tier)
@@ -101,7 +100,7 @@ async def delete(
     key: str,
     request: Request,
     tier: str = "bitgarden",
-    auth: Dict[str, Any] = Depends(require_admin),
+    auth: dict[str, Any] = Depends(require_admin),
 ) -> ZQM_AIResponse:
     fs = _fs(request)
     ok = await fs.delete(key, tier=tier)
@@ -115,7 +114,7 @@ async def delete(
 )
 async def stats(
     request: Request,
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> ZQM_AIResponse:
     fs = _fs(request)
     data = await fs.get_tier_stats()

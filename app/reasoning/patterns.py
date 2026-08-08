@@ -11,24 +11,20 @@ Patterns:
 """
 from __future__ import annotations
 
-import asyncio
-import json
-import os
-import sys
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class ReasoningPattern:
     name = "base"
 
-    async def apply(self, question: str, context: str, model: str) -> Dict[str, Any]:
+    async def apply(self, question: str, context: str, model: str) -> dict[str, Any]:
         raise NotImplementedError
 
 
 class ChainOfThought(ReasoningPattern):
     name = "chain_of_thought"
 
-    async def apply(self, question: str, context: str, model: str) -> Dict[str, Any]:
+    async def apply(self, question: str, context: str, model: str) -> dict[str, Any]:
         from app.services.mesh_ollama import router as mesh_ollama
         prompt = (
             "You are a careful assistant.\n"
@@ -53,7 +49,7 @@ class ChainOfThought(ReasoningPattern):
 class TreeOfThought(ReasoningPattern):
     name = "tree_of_thought"
 
-    async def apply(self, question: str, context: str, model: str) -> Dict[str, Any]:
+    async def apply(self, question: str, context: str, model: str) -> dict[str, Any]:
         from app.services.mesh_ollama import router as mesh_ollama
         branches = []
         for i in range(3):
@@ -82,7 +78,7 @@ class TreeOfThought(ReasoningPattern):
 class SelfConsistency(ReasoningPattern):
     name = "self_consistency"
 
-    async def apply(self, question: str, context: str, model: str) -> Dict[str, Any]:
+    async def apply(self, question: str, context: str, model: str) -> dict[str, Any]:
         from app.services.mesh_ollama import router as mesh_ollama
         prompt = (
             "Use the context below to answer the question.\n"
@@ -97,7 +93,7 @@ class SelfConsistency(ReasoningPattern):
             completions.append((data.get("message") or {}).get("content", "").strip())
         # Simple majority by normalized string
         normed = [c.lower().strip() for c in completions]
-        counts: Dict[str, int] = {}
+        counts: dict[str, int] = {}
         for c in normed:
             counts[c] = counts.get(c, 0) + 1
         best_norm = max(counts, key=counts.get)  # type: ignore
@@ -108,7 +104,7 @@ class SelfConsistency(ReasoningPattern):
 class ConstitutionalAI(ReasoningPattern):
     name = "constitutional_ai"
 
-    async def apply(self, question: str, context: str, model: str) -> Dict[str, Any]:
+    async def apply(self, question: str, context: str, model: str) -> dict[str, Any]:
         from app.services.mesh_ollama import router as mesh_ollama
         prompt = (
             "Use the context below to draft an answer.\n\n"
@@ -143,7 +139,7 @@ class ConstitutionalAI(ReasoningPattern):
 class SelfReflection(ReasoningPattern):
     name = "self_reflection"
 
-    async def apply(self, question: str, context: str, model: str) -> Dict[str, Any]:
+    async def apply(self, question: str, context: str, model: str) -> dict[str, Any]:
         from app.services.mesh_ollama import router as mesh_ollama
         prompt = (
             "Use the context below to answer the question.\n"
@@ -175,7 +171,7 @@ class SelfReflection(ReasoningPattern):
 class ReAct(ReasoningPattern):
     name = "react"
 
-    async def apply(self, question: str, context: str, model: str) -> Dict[str, Any]:
+    async def apply(self, question: str, context: str, model: str) -> dict[str, Any]:
         from app.services.mesh_ollama import router as mesh_ollama
         tools = [
             {"name": "flatspace_search", "description": "Search local knowledge store for relevant context."},

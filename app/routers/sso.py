@@ -6,15 +6,13 @@ Falls back to local JWT when SSO is not enabled.
 """
 from __future__ import annotations
 
-import json
 import os
-from typing import Any, Dict
+from typing import Any
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 
-from app.core.config import settings
 from app.core.logger import get_logger
 from app.core.security import get_current_token_payload
 
@@ -131,7 +129,7 @@ async def sso_login(request: Request) -> JSONResponse:
 
 
 @router.get("/me")
-async def sso_me(auth: Dict[str, Any] = Depends(get_current_token_payload)) -> JSONResponse:
+async def sso_me(auth: dict[str, Any] = Depends(get_current_token_payload)) -> JSONResponse:
     """Return current user identity, normalizing SSO and local tokens."""
     user_id = auth.get("sub")
     username = auth.get("username")

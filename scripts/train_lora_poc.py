@@ -6,11 +6,8 @@ Trains a tiny adapter on local data to validate the Phase 1 pipeline.
 from __future__ import annotations
 
 import argparse
-import json
 import os
-import sys
 import time
-from typing import Optional
 
 
 def _available(*packages: str) -> bool:
@@ -35,7 +32,6 @@ def train_cpu_poc(
     if not _available("torch", "transformers", "peft", "datasets"):
         return "missing_dependencies"
 
-    import torch
     from datasets import load_dataset
     from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
     from transformers import (

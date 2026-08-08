@@ -8,12 +8,11 @@ Pydantic schemas for AI task lifecycle: request → execution → result.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
-
 
 # ── Enumerations ──────────────────────────────────────────────────────────────
 
@@ -70,7 +69,7 @@ class TaskRequest(BaseModel):
         description="Unique task identifier (auto-generated if not provided)",
     )
     input: str = Field(..., description="Primary task input / prompt / instruction")
-    context: Optional[Dict[str, Any]] = Field(
+    context: dict[str, Any] | None = Field(
         default=None,
         description="Additional context, metadata, or parameters",
     )
@@ -86,47 +85,47 @@ class TaskRequest(BaseModel):
         default=InputMethod.DIRECT_API,
         description="Source system that originated this task",
     )
-    agents: Optional[List[str]] = Field(
+    agents: list[str] | None = Field(
         default=None,
         description="Specific agent IDs to use (auto-selected if None)",
     )
-    max_tokens: Optional[int] = Field(
+    max_tokens: int | None = Field(
         default=None,
         ge=1,
         le=128000,
         description="Max tokens for AI response",
     )
-    temperature: Optional[float] = Field(
+    temperature: float | None = Field(
         default=None,
         ge=0.0,
         le=2.0,
         description="AI sampling temperature",
     )
     stream: bool = Field(default=False, description="Stream response tokens")
-    timeout: Optional[int] = Field(
+    timeout: int | None = Field(
         default=None,
         ge=1,
         le=3600,
         description="Task timeout in seconds",
     )
-    model: Optional[str] = Field(
+    model: str | None = Field(
         default=None,
         description="Preferred Ollama model from the mesh catalog (e.g. phi3:mini)",
     )
-    provider: Optional[str] = Field(
+    provider: str | None = Field(
         default=None,
         description="Override AI provider for this task (ollama | openai | anthropic | local_deterministic)",
     )
-    session_id: Optional[str] = Field(
+    session_id: str | None = Field(
         default=None,
         description="Session ID for multi-turn conversations",
     )
-    user_id: Optional[str] = Field(
+    user_id: str | None = Field(
         default=None,
         description="User ID for attribution and personalization",
     )
-    tags: List[str] = Field(default_factory=list, description="Arbitrary tags for filtering")
-    tool_schema: Optional[Dict[str, Any]] = Field(
+    tags: list[str] = Field(default_factory=list, description="Arbitrary tags for filtering")
+    tool_schema: dict[str, Any] | None = Field(
         default=None,
         description="Optional explicit JSON Schema for tool-format outputs. If provided, model outputs are validated against this schema before execution.",
     )
@@ -143,9 +142,9 @@ class TaskRequest(BaseModel):
 class TaskUpdate(BaseModel):
     """Partial update for an existing task (e.g., cancel)."""
 
-    status: Optional[TaskStatus] = None
-    context: Optional[Dict[str, Any]] = None
-    tags: Optional[List[str]] = None
+    status: TaskStatus | None = None
+    context: dict[str, Any] | None = None
+    tags: list[str] | None = None
 
 
 # ── Domain Models ─────────────────────────────────────────────────────────────
@@ -156,41 +155,41 @@ class AgentExecution(BaseModel):
     agent_id: str
     agent_type: str
     started_at: datetime
-    completed_at: Optional[datetime] = None
-    duration_ms: Optional[int] = None
-    output: Optional[Any] = None
-    tokens_used: Optional[int] = None
-    error: Optional[str] = None
-    efficiency_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
-    tool_trace: List[Dict[str, Any]] = Field(
+    completed_at: datetime | None = None
+    duration_ms: int | None = None
+    output: Any | None = None
+    tokens_used: int | None = None
+    error: str | None = None
+    efficiency_score: float | None = Field(default=None, ge=0.0, le=1.0)
+    tool_trace: list[dict[str, Any]] = Field(
         default_factory=list,
         description="Tool/integration actions this agent took to reach The Void's systems "
                     "(e.g. flatspace_search, ollama_models). Each entry: {tool, args, ok, result}.",
     )
     # reconstruction runtime metrics
-    step_hashes: List[str] = Field(default_factory=list, description="Short hashes of intermediate reasoning/output snapshots for variance probing")
-    reconstruction_variance: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Cross-reconstruction semantic variance; low values indicate static-norm collapse")
-    reasoning_step_count: Optional[int] = Field(default=None, description="Number of explicit reasoning steps detected in the trace")
-    reasoning_step_density: Optional[float] = Field(default=None, ge=0.0, description="Reasoning steps per 100 output tokens; low density flags output-only behavior")
+    step_hashes: list[str] = Field(default_factory=list, description="Short hashes of intermediate reasoning/output snapshots for variance probing")
+    reconstruction_variance: float | None = Field(default=None, ge=0.0, le=1.0, description="Cross-reconstruction semantic variance; low values indicate static-norm collapse")
+    reasoning_step_count: int | None = Field(default=None, description="Number of explicit reasoning steps detected in the trace")
+    reasoning_step_density: float | None = Field(default=None, ge=0.0, description="Reasoning steps per 100 output tokens; low density flags output-only behavior")
 
 
 class CognitiveTrace(BaseModel):
     """Full cognitive processing audit trail for a task."""
 
     level: CognitiveLevel
-    agents_used: List[str] = Field(default_factory=list)
-    executions: List[AgentExecution] = Field(default_factory=list)
+    agents_used: list[str] = Field(default_factory=list)
+    executions: list[AgentExecution] = Field(default_factory=list)
     synthesis_applied: bool = False
     memory_reads: int = 0
     memory_writes: int = 0
-    garden_nodes_used: List[str] = Field(default_factory=list)
+    garden_nodes_used: list[str] = Field(default_factory=list)
     total_tokens: int = 0
-    routing: Dict[str, Any] = Field(
+    routing: dict[str, Any] = Field(
         default_factory=dict,
         description="Routing decision metadata: original_level, routed_level, reason, input_method, keyword_triggers",
     )
     input_truncated: bool = False
-    input_truncation_reason: Optional[str] = None
+    input_truncation_reason: str | None = None
 
 
 class Task(BaseModel):
@@ -198,23 +197,23 @@ class Task(BaseModel):
 
     task_id: str
     input: str
-    context: Optional[Dict[str, Any]] = None
+    context: dict[str, Any] | None = None
     cognitive_level: CognitiveLevel = CognitiveLevel.ADVANCED
     priority: TaskPriority = TaskPriority.NORMAL
     input_method: InputMethod = InputMethod.DIRECT_API
     status: TaskStatus = TaskStatus.PENDING
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-    duration_ms: Optional[int] = None
-    session_id: Optional[str] = None
-    user_id: Optional[str] = None
-    tags: List[str] = Field(default_factory=list)
-    result: Optional["TaskResult"] = None
-    cognitive_trace: Optional[CognitiveTrace] = None
-    error: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    duration_ms: int | None = None
+    session_id: str | None = None
+    user_id: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    result: TaskResult | None = None
+    cognitive_trace: CognitiveTrace | None = None
+    error: str | None = None
     retry_count: int = 0
-    falsification_report: Optional[Dict[str, Any]] = Field(default=None, description="Falsification protocol audit result for this task")
+    falsification_report: dict[str, Any] | None = Field(default=None, description="Falsification protocol audit result for this task")
 
 
 class TaskResult(BaseModel):
@@ -223,20 +222,20 @@ class TaskResult(BaseModel):
     task_id: str
     output: Any = Field(..., description="Primary output — text, data, or structured object")
     output_type: str = Field(default="text", description="text | json | binary | stream")
-    confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Model-reported confidence in this output")
-    outcome_verified: Optional[bool] = Field(default=None, description="Whether the result was checked against ground truth or a deterministic validator")
-    calibration_offset: Optional[float] = Field(default=None, description="|confidence - accuracy| after verification; lower is better calibrated")
-    diversity_ratio: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Unique-token ratio across recent agent outputs for this task; low values may indicate attractor collapse")
-    reconstruction_variance: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Cross-reconstruction semantic variance; low values indicate static-norm collapse")
-    reasoning_step_count: Optional[int] = Field(default=None, description="Number of explicit reasoning steps detected in the trace")
-    reasoning_step_density: Optional[float] = Field(default=None, ge=0.0, description="Reasoning steps per 100 output tokens; low density flags output-only behavior")
-    model_used: Optional[str] = None
-    provider_used: Optional[str] = None
-    tokens_input: Optional[int] = None
-    tokens_output: Optional[int] = None
-    total_tokens: Optional[int] = None
-    cost_usd: Optional[float] = None
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0, description="Model-reported confidence in this output")
+    outcome_verified: bool | None = Field(default=None, description="Whether the result was checked against ground truth or a deterministic validator")
+    calibration_offset: float | None = Field(default=None, description="|confidence - accuracy| after verification; lower is better calibrated")
+    diversity_ratio: float | None = Field(default=None, ge=0.0, le=1.0, description="Unique-token ratio across recent agent outputs for this task; low values may indicate attractor collapse")
+    reconstruction_variance: float | None = Field(default=None, ge=0.0, le=1.0, description="Cross-reconstruction semantic variance; low values indicate static-norm collapse")
+    reasoning_step_count: int | None = Field(default=None, description="Number of explicit reasoning steps detected in the trace")
+    reasoning_step_density: float | None = Field(default=None, ge=0.0, description="Reasoning steps per 100 output tokens; low density flags output-only behavior")
+    model_used: str | None = None
+    provider_used: str | None = None
+    tokens_input: int | None = None
+    tokens_output: int | None = None
+    total_tokens: int | None = None
+    cost_usd: float | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
     learned: bool = Field(default=False, description="Whether ZQM_AI learned from this result")
 
 
@@ -246,11 +245,11 @@ class PredictRequest(BaseModel):
     """Request for AI inference/prediction."""
 
     input: str = Field(..., description="Input text or data to run inference on")
-    model: Optional[str] = None
-    provider: Optional[str] = None
+    model: str | None = None
+    provider: str | None = None
     task_type: str = Field(default="completion", description="completion | classification | embedding | extraction")
-    parameters: Dict[str, Any] = Field(default_factory=dict)
-    session_id: Optional[str] = None
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    session_id: str | None = None
 
 
 class PredictResult(BaseModel):
@@ -259,9 +258,9 @@ class PredictResult(BaseModel):
     output: Any
     model: str
     provider: str
-    tokens_used: Optional[int] = None
-    latency_ms: Optional[int] = None
-    confidence: Optional[float] = None
+    tokens_used: int | None = None
+    latency_ms: int | None = None
+    confidence: float | None = None
 
 
 # ── Training Models ───────────────────────────────────────────────────────────
@@ -269,10 +268,10 @@ class PredictResult(BaseModel):
 class TrainRequest(BaseModel):
     """Request to train/fine-tune or feed knowledge to ZQM_AI."""
 
-    data: List[Dict[str, Any]] = Field(..., description="Training examples or knowledge records")
+    data: list[dict[str, Any]] = Field(..., description="Training examples or knowledge records")
     domain: str = Field(default="general", description="Knowledge domain (e.g. gis, hydrology, network)")
     method: str = Field(default="memory", description="memory | fine-tune | few-shot | rag")
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class TrainResult(BaseModel):

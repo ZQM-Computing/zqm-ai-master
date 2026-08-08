@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.core.config import settings
 
@@ -34,7 +34,7 @@ class RedisService:
 
     def __init__(self) -> None:
         self._url: str = settings.redis_url
-        self._client: Optional[Any] = None
+        self._client: Any | None = None
         self._enabled: bool = bool(self._url and _REDIS_AVAILABLE)
 
     async def connect(self) -> bool:
@@ -68,7 +68,7 @@ class RedisService:
                 pass
             self._client = None
 
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> dict[str, Any]:
         """Return Redis health status."""
         with open("C:/Void/ZQM-AI-Master/debug_redis_service.txt", "a", encoding="utf-8") as dbg:
             dbg.write(f"health_check called enabled={self._enabled} available={_REDIS_AVAILABLE} client={self._client}\n")
@@ -108,7 +108,7 @@ class RedisService:
                 dbg.write(f"exception: {exc}\n")
             return {"status": "error", "redis_url": self._url, "error": str(exc)[:200]}
 
-    async def push_metric(self, key: str, payload: Dict[str, Any], ttl: int = 300) -> bool:
+    async def push_metric(self, key: str, payload: dict[str, Any], ttl: int = 300) -> bool:
         """
         Push a metric/message to Redis.
 
@@ -125,7 +125,7 @@ class RedisService:
             log.debug("Redis push failed", key=key, error=str(exc))
             return False
 
-    async def get_list(self, key: str, limit: int = 50) -> List[Dict[str, Any]]:
+    async def get_list(self, key: str, limit: int = 50) -> list[dict[str, Any]]:
         """Retrieve up to `limit` items from a Redis list."""
         if not self._enabled or self._client is None:
             return []

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
@@ -15,7 +15,7 @@ log = get_logger("router.void-council")
 
 @router.get("/domains")
 async def list_domains(
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> JSONResponse:
     domains_mod = __import__("app.orchestrator.void_council", fromlist=["COUNCIL_DOMAINS"])
     domains = [
@@ -40,7 +40,7 @@ async def list_domains(
 @router.post("/convene")
 async def convene_council(
     request: Request,
-    auth: Dict[str, Any] = Depends(require_admin),
+    auth: dict[str, Any] = Depends(require_admin),
 ) -> JSONResponse:
     orch = getattr(request.app.state, "orchestrator", None)
     if orch is None:
@@ -69,7 +69,7 @@ async def convene_council(
         )
     return JSONResponse(
         ZQM_AIResponse.ok(
-            data=result,
+            data={**result, "action_plan": result.get("action_plan") or {}},
             message=f"Void Council convened: {result.get('domain')}",
         ).model_dump(mode="json")
     )
@@ -78,7 +78,7 @@ async def convene_council(
 @router.post("/convene-full")
 async def convene_full_council(
     request: Request,
-    auth: Dict[str, Any] = Depends(require_admin),
+    auth: dict[str, Any] = Depends(require_admin),
 ) -> JSONResponse:
     orch = getattr(request.app.state, "orchestrator", None)
     if orch is None:
@@ -114,7 +114,7 @@ async def convene_full_council(
 async def council_history(
     request: Request,
     limit: int = 20,
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> JSONResponse:
     orch = getattr(request.app.state, "orchestrator", None)
     if orch is None or not hasattr(orch, "_void_council"):
@@ -137,7 +137,7 @@ async def council_history(
 @router.post("/emergency")
 async def emergency_council(
     request: Request,
-    auth: Dict[str, Any] = Depends(require_admin),
+    auth: dict[str, Any] = Depends(require_admin),
 ) -> JSONResponse:
     orch = getattr(request.app.state, "orchestrator", None)
     if orch is None or not hasattr(orch, "_void_council"):
@@ -175,7 +175,7 @@ async def emergency_council(
 async def council_quality(
     request: Request,
     limit: int = 20,
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> JSONResponse:
     orch = getattr(request.app.state, "orchestrator", None)
     if orch is None or not hasattr(orch, "_void_council"):

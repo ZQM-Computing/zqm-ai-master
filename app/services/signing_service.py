@@ -7,13 +7,12 @@ Supports:
 """
 from __future__ import annotations
 
-import json
 import os
 import subprocess
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
-def _run(cmd: List[str], **kwargs) -> Dict[str, Any]:
+def _run(cmd: list[str], **kwargs) -> dict[str, Any]:
     try:
         out = subprocess.run(cmd, capture_output=True, text=True, timeout=kwargs.get("timeout", 60))
         return {"ok": out.returncode == 0, "stdout": out.stdout, "stderr": out.stderr, "code": out.returncode}
@@ -21,7 +20,7 @@ def _run(cmd: List[str], **kwargs) -> Dict[str, Any]:
         return {"ok": False, "stdout": "", "stderr": str(exc), "code": -1}
 
 
-def cms_sign(file_path: str, cert_path: str, key_path: str, output_path: str) -> Dict[str, Any]:
+def cms_sign(file_path: str, cert_path: str, key_path: str, output_path: str) -> dict[str, Any]:
     """Sign a file/deliverable with CMS/PKCS7 via external toolkit."""
     script = os.getenv("ZQM_CMS_SIGN_SCRIPT", "")
     if not script or not os.path.exists(script):
@@ -29,14 +28,14 @@ def cms_sign(file_path: str, cert_path: str, key_path: str, output_path: str) ->
     return _run(["python", script, "--input", file_path, "--cert", cert_path, "--key", key_path, "--out", output_path])
 
 
-def authenticode_sign(file_path: str, cert_thumbprint: str, timestamp_url: str = "http://timestamp.digicert.com") -> Dict[str, Any]:
+def authenticode_sign(file_path: str, cert_thumbprint: str, timestamp_url: str = "http://timestamp.digicert.com") -> dict[str, Any]:
     """Sign a PE/binary with Authenticode via signtool."""
     signtool = os.getenv("ZQM_SIGNTOOL", "signtool")
     cmd = [signtool, "sign", "/sha1", cert_thumbprint, "/t", timestamp_url, file_path]
     return _run(cmd)
 
 
-def sign_bundle(files: List[str], mode: str = "cms", **kwargs) -> Dict[str, Any]:
+def sign_bundle(files: list[str], mode: str = "cms", **kwargs) -> dict[str, Any]:
     """Sign one or more files using the requested backend."""
     results = []
     for path in files:

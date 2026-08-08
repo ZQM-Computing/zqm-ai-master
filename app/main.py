@@ -13,10 +13,10 @@ from __future__ import annotations
 
 import os
 import time
-import json
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, AsyncGenerator, Dict
+from typing import Any
 
 from fastapi import Body, Depends, FastAPI, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,13 +27,36 @@ from app.core.config import settings
 from app.core.logger import configure_logging, get_logger
 from app.core.security import get_current_token_payload, require_admin
 from app.models.response import ErrorResponse
-from app.services.mesh_ollama import OllamaUnavailable
 from app.orchestrator.zqm_ai_orchestrator import ZQM_AIOrchestrator
 from app.routers import (
-    dashboard, events, garden, info, internal, moltbook, observability, permissions, predict, process, settings as settings_router,
-    status as status_router, train, users, webhooks, flatspace, falsification, sso,
+    dashboard,
+    events,
+    falsification,
+    flatspace,
+    garden,
+    info,
+    internal,
+    mesh_ops,
+    mesh_probe,
+    moltbook,
+    observability,
+    permissions,
+    predict,
+    process,
+    quantum_llm_bridge,
+    sso,
+    train,
+    users,
+    void_council,
+    webhooks,
 )
-from app.routers import mesh_probe, mesh_ops, quantum_llm_bridge, void_council
+from app.routers import (
+    settings as settings_router,
+)
+from app.routers import (
+    status as status_router,
+)
+from app.services.mesh_ollama import OllamaUnavailable
 
 # ── Configure logging first ───────────────────────────────────────────────────
 configure_logging(
@@ -325,15 +348,15 @@ async def api_healthz(request: Request):
 @app.get("/api/self-improvement", tags=["Self-Improvement"])
 async def self_improvement_findings(
     request: Request,
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
     limit: int = 50,
 ) -> JSONResponse:
     """
     Return self-improvement findings persisted locally (app/self_improvement_log.jsonl)
     when the FLATSPACE backend is unreachable. Newest first. Requires a valid token.
     """
-    from pathlib import Path
     import json as _json
+    from pathlib import Path
 
     log_path = Path(__file__).resolve().parent / "self_improvement_log.jsonl"
     if not log_path.exists():
@@ -373,7 +396,7 @@ async def self_improvement_findings(
 @app.get("/api/self-apply/status", tags=["Self-Improvement"])
 async def self_apply_status(
     request: Request,
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> JSONResponse:
     """Report the RUNNING process's self-apply gate state (live, not a fresh interpreter)."""
     from app.orchestrator import self_apply
@@ -391,7 +414,7 @@ async def self_apply_status(
 @app.get("/api/self-expand/status", tags=["Self-Expansion"])
 async def self_expand_status(
     request: Request,
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> JSONResponse:
     """Report the self-expansion gate state + ledger length (live)."""
     from app.orchestrator import self_expand
@@ -408,7 +431,7 @@ async def self_expand_status(
 @app.get("/api/self-expand/ledger", tags=["Self-Expansion"])
 async def self_expand_ledger(
     request: Request,
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> JSONResponse:
     """Return the expansion ledger (the human-review approval queue)."""
     from app.orchestrator import self_expand
@@ -421,7 +444,7 @@ async def self_expand_ledger(
 @app.post("/api/self-expand/apply", tags=["Self-Expansion"])
 async def self_expand_apply(
     request: Request,
-    auth: Dict[str, Any] = Depends(require_admin),
+    auth: dict[str, Any] = Depends(require_admin),
 ) -> JSONResponse:
     """ADMIN: replay the RAW self-improvement findings through process_findings
     (applies any pending expansions IF ZQM_SELF_APPLY is on; otherwise
@@ -465,7 +488,7 @@ async def self_expand_apply(
 @app.post("/api/self-improve/run", tags=["Self-Improvement"])
 async def self_improve_run(
     request: Request,
-    auth: Dict[str, Any] = Depends(require_admin),
+    auth: dict[str, Any] = Depends(require_admin),
 ) -> JSONResponse:
     """ADMIN: run The Void's SELF-EXECUTING improvement engine (P9) now.
 
@@ -483,7 +506,7 @@ async def self_improve_run(
 @app.get("/api/self-improve/ledger", tags=["Self-Improvement"])
 async def self_improve_ledger(
     request: Request,
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> JSONResponse:
     """Return the self-improvement (P9) ledger of proposed + applied patches."""
     from app.orchestrator import self_improve
@@ -498,7 +521,7 @@ async def self_improve_ledger(
 @app.post("/api/void/talk", tags=["The Void"])
 async def void_talk(
     request: Request,
-    auth: Dict[str, Any] = Depends(require_admin),
+    auth: dict[str, Any] = Depends(require_admin),
     message: str = Body("", embed=True),
 ) -> JSONResponse:
     """Speak with The Void — conversational surface + continuous self-improvement hook."""
@@ -559,7 +582,7 @@ async def void_talk(
 
 async def self_apply_selftest(
     request: Request,
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> JSONResponse:
     """
     Perform a REAL apply through the RUNNING orchestrator to prove the
@@ -569,6 +592,7 @@ async def self_apply_selftest(
     if the gate is OFF.
     """
     from pathlib import Path
+
     from app.orchestrator import self_apply
 
     if not self_apply.SELF_APPLY_ON:
@@ -615,7 +639,7 @@ async def self_apply_selftest(
 @app.get("/api/self-replicate/status", tags=["Self-Replication"])
 async def self_replicate_status(
     request: Request,
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> JSONResponse:
     """Report the self-replication gate state + ledger length (live)."""
     from app.orchestrator import self_replicate
@@ -631,7 +655,7 @@ async def self_replicate_status(
 @app.get("/api/self-replicate/ledger", tags=["Self-Replication"])
 async def self_replicate_ledger(
     request: Request,
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> JSONResponse:
     """Return the replication ledger (the audit trail of proposed/applied replicas)."""
     from app.orchestrator import self_replicate
@@ -644,7 +668,7 @@ async def self_replicate_ledger(
 @app.post("/api/self-replicate", tags=["Self-Replication"])
 async def self_replicate_apply(
     request: Request,
-    auth: Dict[str, Any] = Depends(require_admin),
+    auth: dict[str, Any] = Depends(require_admin),
 ) -> JSONResponse:
     """ADMIN: replicate The Void to a mesh node. Body: {"node": "N3", "confirm": true}.
 
@@ -667,7 +691,7 @@ async def self_replicate_apply(
 
 
 @app.get("/api/version", tags=["Meta"])
-async def version_info() -> Dict[str, Any]:
+async def version_info() -> dict[str, Any]:
     """Return The Void version manifest (see app/core/version.py)."""
     from app.core.version import get_version
     return get_version()
@@ -677,7 +701,7 @@ async def version_info() -> Dict[str, Any]:
 @app.get("/api/flatspace", tags=["Integration"])
 async def flatspace_search(
     request: Request,
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
     query: str = "",
     tier: str = "bitgarden",
     limit: int = 20,
@@ -701,7 +725,7 @@ async def flatspace_search(
 @app.get("/api/task-audit", tags=["Integration"])
 async def task_audit(
     request: Request,
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
     limit: int = 20,
 ) -> JSONResponse:
     """Return recent task-result audit records from FLATSPACE bitgarden."""
@@ -718,7 +742,7 @@ async def task_audit(
 @app.get("/api/mcp-audit", tags=["Integration"])
 async def mcp_audit(
     request: Request,
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
     limit: int = 20,
 ) -> JSONResponse:
     """Return Machine-Checkable Proof audit records from FLATSPACE waxcell."""
@@ -735,8 +759,8 @@ async def mcp_audit(
 @app.post("/api/roundtable", tags=["Integration"])
 async def roundtable(
     request: Request,
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
-    body: Dict[str, Any] = None,
+    auth: dict[str, Any] = Depends(get_current_token_payload),
+    body: dict[str, Any] = None,
 ) -> JSONResponse:
     """
     Convene a multi-agent roundtable IN-VOID. Body: {topic, panel?, rounds?}.
@@ -779,7 +803,7 @@ async def roundtable(
 @app.post("/api/integrate", tags=["Integration"])
 async def integrate(
     request: Request,
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> JSONResponse:
     """
     Trigger P4a: read self-improvement findings and tune the LIVE agent pool.
@@ -795,8 +819,8 @@ async def integrate(
 
 @app.get("/api/stream/stats", tags=["Streaming"])
 async def stream_stats(
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
-) -> Dict[str, Any]:
+    auth: dict[str, Any] = Depends(get_current_token_payload),
+) -> dict[str, Any]:
     from app.core.event_bus import bus
 
     snapshot = {
@@ -812,7 +836,7 @@ async def stream_stats(
 @app.get("/api/stream", tags=["Streaming"])
 async def stream_events(
     request: Request,
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
     since: str = Query(None),
 ) -> StreamingResponse:
     """
@@ -853,7 +877,7 @@ async def stream_events(
 @app.get("/api/stream/webhooks", tags=["Streaming"])
 async def stream_webhooks(
     request: Request,
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
     since: str = Query(None),
 ) -> StreamingResponse:
     """SSE stream of webhook events only."""
@@ -889,8 +913,8 @@ async def stream_webhooks(
 @app.get("/api/mesh/ollama", tags=["Mesh"])
 async def mesh_ollama_status(
     request: Request,
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
-) -> Dict[str, Any]:
+    auth: dict[str, Any] = Depends(get_current_token_payload),
+) -> dict[str, Any]:
     """Mesh Ollama federation status: backend health + aggregated model catalog."""
     from app.services.mesh_ollama import router as mesh_ollama
     catalog = await mesh_ollama.list_models()
@@ -923,12 +947,16 @@ app.include_router(moltbook.router)
 app.include_router(void_council.router)
 app.include_router(mesh_ops.router)
 from app.routers.rag import router as rag_router
+
 app.include_router(rag_router)
 from app.routers.reasoning import router as reasoning_router
+
 app.include_router(reasoning_router)
 from app.routers.train import router as train_router
+
 app.include_router(train_router)
 from app.routers.support import router as support_router
+
 app.include_router(support_router)
 
 

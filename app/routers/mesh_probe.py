@@ -7,26 +7,26 @@ Lightweight diagnostic surface for mesh backends + inference probes.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
 from app.core.security import get_current_token_payload
-from app.services.mesh_ollama import MeshOllamaRouter, DEFAULT_BACKENDS
+from app.services.mesh_ollama import DEFAULT_BACKENDS, MeshOllamaRouter
 
 router = APIRouter(prefix="/api/mesh", tags=["Mesh"])
 
 
 @router.get("/backends")
 async def mesh_backends(
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> JSONResponse:
     """Return the canonical backend map + current health flags from a fresh
     MeshOllamaRouter refresh. Does NOT call inference — cheap and safe."""
     router = MeshOllamaRouter()
     await router.refresh(force=True)
-    out: List[Dict[str, Any]] = []
+    out: list[dict[str, Any]] = []
     for b in DEFAULT_BACKENDS:
         out.append({
             "name": b["name"],
@@ -42,8 +42,8 @@ async def mesh_backends(
 
 @router.post("/probe")
 async def mesh_probe_infer(
-    request: Dict[str, Any],
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    request: dict[str, Any],
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> JSONResponse:
     """Probe actual inference on every backend that can serve `model`.
     Returns per-backend status + first successful chat payload, or the last

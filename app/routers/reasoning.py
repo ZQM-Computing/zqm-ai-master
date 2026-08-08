@@ -5,14 +5,14 @@ Apply a reasoning pattern to a question with retrieved context.
 """
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
+from app.core.config import settings
 from app.core.logger import get_logger
 from app.core.security import get_current_token_payload
-from app.core.config import settings
 from app.reasoning.patterns import get_pattern
 
 router = APIRouter(prefix="/api/reasoning", tags=["Reasoning"])
@@ -22,8 +22,8 @@ log = get_logger("router.reasoning")
 @router.post("/query")
 async def query(
     request: Request,
-    body: Dict[str, Any],
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    body: dict[str, Any],
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> JSONResponse:
     orch = getattr(request.app.state, "orchestrator", None)
     if orch is None:

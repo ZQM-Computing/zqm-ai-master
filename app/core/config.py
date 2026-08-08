@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import os
 from functools import lru_cache
-from typing import Dict, Literal, List
+from typing import Literal
 
 from dotenv import load_dotenv
 from pydantic import AliasChoices, Field, field_validator
@@ -140,7 +140,7 @@ class Settings(BaseSettings):
     garden_node_4_port: int = 443
     garden_timeout: int = 15
     garden_retries: int = 3
-    garden_api_ports: Dict[str, int] = {
+    garden_api_ports: dict[str, int] = {
         "garden-0": 8808,
         "garden-1": 5000,
         "garden-2": 5000,
@@ -327,7 +327,7 @@ class Settings(BaseSettings):
 
     # ── Computed properties ───────────────────────────────────────────────────
     @property
-    def cors_origins_list(self) -> List[str]:
+    def cors_origins_list(self) -> list[str]:
         if self.cors_origins == "*":
             return ["*"]
         return [o.strip() for o in self.cors_origins.split(",")]
@@ -341,7 +341,7 @@ class Settings(BaseSettings):
         return self.environment == "development"
 
     @property
-    def garden_nodes(self) -> List[str]:
+    def garden_nodes(self) -> list[str]:
         return [
             self.garden_node_0,
             self.garden_node_1,
@@ -379,7 +379,7 @@ class Settings(BaseSettings):
         return v
 
 
-@lru_cache()
+@lru_cache
 def get_settings() -> Settings:
     """Cached settings instance — call this everywhere."""
     return Settings()

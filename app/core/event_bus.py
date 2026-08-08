@@ -15,8 +15,9 @@ Events are dicts: {"event": <type>, "data": <payload>, "ts": <iso>}.
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
-from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
+from collections.abc import AsyncIterator
+from datetime import UTC, datetime
+from typing import Any
 
 from app.core.logger import get_logger
 
@@ -28,18 +29,18 @@ _BACKLOG_MAX = 128  # max events retained when subscriber falls behind
 
 class EventBus:
     def __init__(self) -> None:
-        self._subscribers: List[asyncio.Queue] = []
-        self._history: List[Dict[str, Any]] = []
+        self._subscribers: list[asyncio.Queue] = []
+        self._history: list[dict[str, Any]] = []
         self._lock = asyncio.Lock()
         self._lag_counter: int = 0
 
     async def publish(
-        self, event: str, data: Any, ts: Optional[str] = None
+        self, event: str, data: Any, ts: str | None = None
     ) -> None:
         record = {
             "event": event,
             "data": data,
-            "ts": ts or datetime.now(timezone.utc).isoformat(),
+            "ts": ts or datetime.now(UTC).isoformat(),
         }
         async with self._lock:
             self._history.append(record)
@@ -72,15 +73,15 @@ class EventBus:
 
     def subscribe(
         self, history: bool = True, maxlen: int = 256
-    ) -> "EventBusSubscription":
+    ) -> EventBusSubscription:
         return EventBusSubscription(self, history=history, maxlen=maxlen)
 
     def subscribe_by_topic(
         self, topic: str, history: bool = True, maxlen: int = 256
-    ) -> "EventBusTopicSubscription":
+    ) -> EventBusTopicSubscription:
         return EventBusTopicSubscription(self, topic=topic, history=history, maxlen=maxlen)
 
-    def iter_recent(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+    def iter_recent(self, limit: int | None = None) -> list[dict[str, Any]]:
         snap = list(self._history)
         if limit is not None:
             if len(snap) > limit:
@@ -94,7 +95,7 @@ class EventBusSubscription:
         self._q: asyncio.Queue = asyncio.Queue(maxsize=maxlen)
         self._history = history
 
-    async def __aenter__(self) -> AsyncIterator[Dict[str, Any]]:
+    async def __aenter__(self) -> AsyncIterator[dict[str, Any]]:
         async with self._bus._lock:
             self._bus._subscribers.append(self._q)
             backlog = list(self._bus._history) if self._history else []
@@ -110,7 +111,7 @@ class EventBusSubscription:
             if self._q in self._bus._subscribers:
                 self._bus._subscribers.remove(self._q)
 
-    async def _gen(self) -> AsyncIterator[Dict[str, Any]]:
+    async def _gen(self) -> AsyncIterator[dict[str, Any]]:
         while True:
             try:
                 yield await self._q.get()
@@ -125,7 +126,7 @@ class EventBusTopicSubscription:
         self._q: asyncio.Queue = asyncio.Queue(maxsize=maxlen)
         self._history = history
 
-    async def __aenter__(self) -> AsyncIterator[Dict[str, Any]]:
+    async def __aenter__(self) -> AsyncIterator[dict[str, Any]]:
         async with self._bus._lock:
             self._bus._subscribers.append(self._q)
             if self._history:
@@ -142,7 +143,7 @@ class EventBusTopicSubscription:
             if self._q in self._bus._subscribers:
                 self._bus._subscribers.remove(self._q)
 
-    async def _gen(self) -> AsyncIterator[Dict[str, Any]]:
+    async def _gen(self) -> AsyncIterator[dict[str, Any]]:
         while True:
             try:
                 rec = await self._q.get()

@@ -26,12 +26,11 @@ from __future__ import annotations
 
 import json
 import os
-import re
-import shutil
 import py_compile
-from datetime import datetime, timezone
+import shutil
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.core.logger import get_logger
 
@@ -50,14 +49,14 @@ _LEDGER_PATH = Path(__file__).resolve().parent / "self_improve_ledger.jsonl"
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 # ── Known safe self-patches (The Void fixing its own code) ────────────────────
 # Each: id, file (rel to repo root), old (exact), new, why.
 # `old` MUST be a unique substring of the target file or the patch is rejected
 # (safety: no ambiguous edits).
-KNOWN_PATCHES: List[Dict[str, str]] = [
+KNOWN_PATCHES: list[dict[str, str]] = [
     {
         "id": "env-version-envelope",
         "file": "app/models/response.py",
@@ -105,7 +104,7 @@ def _resolve(rel: str) -> Path:
     return _REPO_ROOT / rel
 
 
-def _audit(orchestrator: Any, record: Dict[str, Any]) -> None:
+def _audit(orchestrator: Any, record: dict[str, Any]) -> None:
     record = {**record, "ts": _now(), "self_apply": SELF_APPLY_ON}
     try:
         with _LEDGER_PATH.open("a", encoding="utf-8") as f:
@@ -123,7 +122,7 @@ def _audit(orchestrator: Any, record: Dict[str, Any]) -> None:
         pass
 
 
-def apply_patch(orchestrator: Any, patch: Dict[str, str]) -> Dict[str, Any]:
+def apply_patch(orchestrator: Any, patch: dict[str, str]) -> dict[str, Any]:
     """Validate + (if gated) apply ONE self-patch to The Void's own code.
 
     Returns {applied, reason, ...}. Safe: unique-match + compile-check + .bak.
@@ -164,13 +163,13 @@ def apply_patch(orchestrator: Any, patch: Dict[str, str]) -> Dict[str, Any]:
         return {"applied": False, "id": pid, "reason": f"apply failed: {exc}"}
 
 
-async def scan_and_improve(orchestrator: Any) -> Dict[str, Any]:
+async def scan_and_improve(orchestrator: Any) -> dict[str, Any]:
     """Run every known self-patch that currently matches The Void's own code.
 
     Returns a summary {self_apply, proposed, applied, actions}.
     """
-    applied: List[Dict[str, Any]] = []
-    proposed: List[Dict[str, Any]] = []
+    applied: list[dict[str, Any]] = []
+    proposed: list[dict[str, Any]] = []
     for patch in KNOWN_PATCHES:
         res = apply_patch(orchestrator, patch)
         (applied if res.get("applied") else proposed).append(res)
@@ -186,7 +185,7 @@ async def scan_and_improve(orchestrator: Any) -> Dict[str, Any]:
     return summary
 
 
-def review_ledger(limit: int = 50) -> List[Dict[str, Any]]:
+def review_ledger(limit: int = 50) -> list[dict[str, Any]]:
     if not _LEDGER_PATH.exists():
         return []
     rows = [json.loads(l) for l in _LEDGER_PATH.read_text(encoding="utf-8").splitlines() if l.strip()]

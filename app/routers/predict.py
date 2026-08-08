@@ -8,7 +8,7 @@ Direct AI inference endpoint (faster than /process, no agent routing).
 from __future__ import annotations
 
 import time
-from typing import Any, Dict
+from typing import Any
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -36,7 +36,7 @@ log = get_logger("router.predict")
 async def predict(
     request_body: PredictRequest,
     request: Request,
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> ZQM_AIResponse:
     """
     Fast direct inference using the default or specified AI provider.
@@ -94,7 +94,7 @@ async def predict(
 )
 async def list_models() -> ZQM_AIResponse:
     """Return available models across all configured AI providers."""
-    models: Dict[str, Any] = {
+    models: dict[str, Any] = {
         "ollama": {"base_url": settings.ollama_base_url, "default": settings.ollama_default_model},
         "openai": {"available": bool(settings.openai_api_key), "default": settings.openai_default_model},
         "anthropic": {"available": bool(settings.anthropic_api_key), "default": settings.anthropic_default_model},

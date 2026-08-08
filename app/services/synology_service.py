@@ -9,9 +9,7 @@ Provides DSM discovery, health, and maintenance operations.
 from __future__ import annotations
 
 import asyncio
-import hashlib
-import hmac
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
 
@@ -36,7 +34,7 @@ class SynologyService:
         self._base = "https://{ip}:{port}/webapi"
         self._timeout = settings.garden_timeout
 
-    def _auth_headers(self, account: Optional[str] = None, passwd: Optional[str] = None) -> Dict[str, str]:
+    def _auth_headers(self, account: str | None = None, passwd: str | None = None) -> dict[str, str]:
         return {
             "Content-Type": "application/x-www-form-urlencoded",
             "X-SYNO-TOKEN": "",
@@ -50,7 +48,7 @@ class SynologyService:
         )
         return any(r is True for r in results)
 
-    async def _probe(self, node: Dict[str, Any]) -> bool:
+    async def _probe(self, node: dict[str, Any]) -> bool:
         try:
             async with httpx.AsyncClient(timeout=2, verify=False) as client:
                 r = await client.get(
@@ -62,13 +60,13 @@ class SynologyService:
         except Exception:
             return False
 
-    async def get_node_system_info(self) -> List[Dict[str, Any]]:
+    async def get_node_system_info(self) -> list[dict[str, Any]]:
         """Fetch DSM system info from every reachable node."""
         results = await asyncio.gather(
             *[self._get_info(node) for node in self.GARDEN_NODES],
             return_exceptions=True,
         )
-        out: List[Dict[str, Any]] = []
+        out: list[dict[str, Any]] = []
         for node, result in zip(self.GARDEN_NODES, results):
             if isinstance(result, Exception):
                 out.append({
@@ -81,7 +79,7 @@ class SynologyService:
                 out.append(result)
         return out
 
-    async def _get_info(self, node: Dict[str, Any]) -> Dict[str, Any]:
+    async def _get_info(self, node: dict[str, Any]) -> dict[str, Any]:
         try:
             async with httpx.AsyncClient(timeout=3, verify=False) as client:
                 r = await client.get(

@@ -54,7 +54,7 @@ class TenantResolver:
             pass
         return self._default
 
-    def _map_host(self, host: str) -> Optional[TenantContext]:
+    def _map_host(self, host: str) -> TenantContext | None:
         mapping = {
             "localhost": self._default,
         }

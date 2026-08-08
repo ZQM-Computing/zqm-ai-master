@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class PerformanceRegressionDetector:
@@ -11,7 +11,7 @@ class PerformanceRegressionDetector:
         self.history_path = history_path
         self.window = window
 
-    def record(self, metric_name: str, value: float, metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def record(self, metric_name: str, value: float, metadata: dict[str, Any] | None = None) -> dict[str, Any]:
         record = {
             "timestamp": __import__("datetime").datetime.utcnow().isoformat() + "Z",
             "metric": metric_name,
@@ -23,10 +23,10 @@ class PerformanceRegressionDetector:
             f.write(json.dumps(record) + "\n")
         return {"status": "recorded", "metric": metric_name, "value": value}
 
-    def detect(self, metric_name: str, tolerance: float = 0.05) -> Dict[str, Any]:
+    def detect(self, metric_name: str, tolerance: float = 0.05) -> dict[str, Any]:
         if not os.path.exists(self.history_path):
             return {"regression": False, "reason": "no_history"}
-        values: List[float] = []
+        values: list[float] = []
         with open(self.history_path, "r", encoding="utf-8") as f:
             for line in f:
                 line = line.strip()

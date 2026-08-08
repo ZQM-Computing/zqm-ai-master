@@ -29,9 +29,9 @@ import json
 import os
 import re
 import shutil
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from app.core.logger import get_logger
 
@@ -64,7 +64,7 @@ TOOL_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{2,40}$")
 # "finding" (literal text such as "<rel path under app/>" or "<exact old text>").
 # Reject any directive that still contains template placeholders / angle
 # brackets so it never reaches the ledger as a bogus entry.
-_PLACEHOLDER_RE = re.compile(r"<[^>]+>|rel path under app|exact old text|exact new text", re.I)
+_PLACEHOLDER_RE = re.compile(r"<[^>]+>|rel path under app|exact old text|exact new text", re.IGNORECASE)
 def _is_placeholder(text):
     return bool(_PLACEHOLDER_RE.search(text or ""))
 
@@ -87,10 +87,10 @@ _LEDGER_PATH = Path(__file__).resolve().parent.parent / "self_expand_ledger.json
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
-def _audit(orchestrator: Any, kind: str, record: Dict[str, Any]) -> None:
+def _audit(orchestrator: Any, kind: str, record: dict[str, Any]) -> None:
     """Write an expansion event immutably to FLATSPACE (waxcell) + local ledger."""
     record = {**record, "kind": kind, "ts": _now(), "self_apply": SELF_APPLY_ON}
     # Local ledger (always, best-effort).
@@ -113,8 +113,8 @@ def _audit(orchestrator: Any, kind: str, record: Dict[str, Any]) -> None:
 
 # ── Agent expansion ───────────────────────────────────────────────────────────
 
-def _parse_kv(block: str) -> Dict[str, str]:
-    out: Dict[str, str] = {}
+def _parse_kv(block: str) -> dict[str, str]:
+    out: dict[str, str] = {}
     for line in block.strip().splitlines():
         if ":" in line:
             k, v = line.split(":", 1)
@@ -122,7 +122,7 @@ def _parse_kv(block: str) -> Dict[str, str]:
     return out
 
 
-async def expand_agent(orchestrator: Any, block: str) -> Dict[str, Any]:
+async def expand_agent(orchestrator: Any, block: str) -> dict[str, Any]:
     """Validate + (if gated on) register a new agent from an EXPAND_AGENT block."""
     kv = _parse_kv(block)
     name = kv.get("name", "").strip()
@@ -155,8 +155,9 @@ async def expand_agent(orchestrator: Any, block: str) -> Dict[str, Any]:
 
     # Apply: register into the live registry (runtime-only; resets on restart).
     try:
-        from app.models.agent import AgentCreate, AgentType as AT
         from app.core.config import settings as _settings
+        from app.models.agent import AgentCreate
+        from app.models.agent import AgentType as AT
         reg = getattr(orchestrator, "registry", None)
         if reg is None:
             return {"applied": False, "reason": "no registry"}
@@ -181,7 +182,7 @@ async def expand_agent(orchestrator: Any, block: str) -> Dict[str, Any]:
 _TOOLS_CLI = Path(r"C:\Users\zqmco\zqm-mcp\zqm_tools_cli.py")
 
 
-async def expand_tool(orchestrator: Any, block: str) -> Dict[str, Any]:
+async def expand_tool(orchestrator: Any, block: str) -> dict[str, Any]:
     """Validate + (if gated on) append a new mesh-probe tool to the zqm-tools CLI."""
     kv = _parse_kv(block)
     tname = (kv.get("name") or "").strip().lower()
@@ -193,7 +194,7 @@ async def expand_tool(orchestrator: Any, block: str) -> Dict[str, Any]:
     if not probe:
         return {"applied": False, "reason": "missing probe/target"}
     # Safety: a tool probe must be a known mesh node token or a whitelisted pattern.
-    if not re.search(r"\b(N1|N2|N3|N4|node|mesh)\b", probe, re.I) and "MESH_PORTS" not in probe:
+    if not re.search(r"\b(N1|N2|N3|N4|node|mesh)\b", probe, re.IGNORECASE) and "MESH_PORTS" not in probe:
         return {"applied": False, "reason": "probe must reference a mesh node/port (safety)"}
 
     proposal = {"tool": tname, "probe": probe[:200], "description": desc[:200]}
@@ -231,7 +232,7 @@ async def expand_tool(orchestrator: Any, block: str) -> Dict[str, Any]:
 
 # ── PATCH expansion (reuses self_apply) ────────────────────────────────────────
 
-async def expand_patch(orchestrator: Any, patch: Dict[str, str]) -> Dict[str, Any]:
+async def expand_patch(orchestrator: Any, patch: dict[str, str]) -> dict[str, Any]:
     """Route a structured PATCH to the existing safe self-apply pipeline."""
     from app.orchestrator.self_apply import self_apply
     _audit(orchestrator, "patch", {**patch, "applied": False, "phase": "proposed"})
@@ -244,14 +245,14 @@ async def expand_patch(orchestrator: Any, patch: Dict[str, str]) -> Dict[str, An
 
 # ── Orchestration: scan findings for all three directive types ────────────────
 
-async def process_findings(orchestrator: Any, findings_text: str) -> Dict[str, Any]:
+async def process_findings(orchestrator: Any, findings_text: str) -> dict[str, Any]:
     """Parse a self-improvement findings blob and apply/expand every directive.
 
     Returns a summary of proposals + applied actions. Safe by default:
     with ZQM_SELF_APPLY off, nothing is mutated — only proposed + audited.
     """
-    applied: List[Dict[str, Any]] = []
-    proposed: List[Dict[str, Any]] = []
+    applied: list[dict[str, Any]] = []
+    proposed: list[dict[str, Any]] = []
 
     # EXPAND_AGENT
     for m in _EXPAND_AGENT_RE.finditer(findings_text):
@@ -277,7 +278,7 @@ async def process_findings(orchestrator: Any, findings_text: str) -> Dict[str, A
     }
 
 
-def review_ledger(limit: int = 50) -> List[Dict[str, Any]]:
+def review_ledger(limit: int = 50) -> list[dict[str, Any]]:
     """Return the local expansion ledger for human review (the approval queue)."""
     if not _LEDGER_PATH.exists():
         return []

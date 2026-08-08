@@ -11,12 +11,18 @@ ZQM Observability endpoint: http://192.168.1.225:9090/api/metrics
 from __future__ import annotations
 
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
 
 try:
-    from prometheus_client import Counter, Gauge, Histogram, CollectorRegistry, generate_latest
+    from prometheus_client import (
+        CollectorRegistry,
+        Counter,
+        Gauge,
+        Histogram,
+        generate_latest,
+    )
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
@@ -93,7 +99,7 @@ class ObservabilityService:
         self._endpoint = settings.observability_endpoint
         self._enabled = settings.observability_enabled
         self._timeout = 5
-        self._batch: List[Dict[str, Any]] = []
+        self._batch: list[dict[str, Any]] = []
         self._batch_size = 10
 
     # ── Health ────────────────────────────────────────────────────────────────
@@ -116,7 +122,7 @@ class ObservabilityService:
 
     # ── Task metrics ──────────────────────────────────────────────────────────
 
-    async def push_task_metric(self, task: Task, result: Optional[TaskResult] = None) -> None:
+    async def push_task_metric(self, task: Task, result: TaskResult | None = None) -> None:
         """Push a task completion metric to ZQM Observability."""
         if not self._enabled:
             return
@@ -195,7 +201,7 @@ class ObservabilityService:
         if len(self._batch) >= self._batch_size:
             await self._flush_batch()
 
-    async def push_agent_metric(self, agent_stats: Dict[str, Any]) -> None:
+    async def push_agent_metric(self, agent_stats: dict[str, Any]) -> None:
         """Push agent pool statistics."""
         if not self._enabled:
             return
@@ -232,7 +238,7 @@ class ObservabilityService:
         event_type: str,
         message: str,
         severity: str = "info",
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> None:
         """Push a structured event log to ZQM Observability."""
         if not self._enabled:

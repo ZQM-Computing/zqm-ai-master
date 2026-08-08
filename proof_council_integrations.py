@@ -1,9 +1,8 @@
 """Proof script for Void Council integrations."""
 import asyncio
 import json
-import os
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 BASE = "http://127.0.0.1:8808"
 
@@ -77,7 +76,7 @@ async def main():
 
     # 7) Write proof file
     proof = {
-        "ts": datetime.now(timezone.utc).isoformat(),
+        "ts": datetime.now(UTC).isoformat(),
         "convene": data,
         "quality": qdata,
         "status_redis": status_data.get("redis"),

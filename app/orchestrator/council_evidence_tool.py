@@ -1,4 +1,4 @@
-"""
+r"""
 Evidence-based council/value-improvement tool.
 
 Bypasses noisy LLM-only council output and derives findings directly
@@ -12,15 +12,13 @@ Outputs:
 from __future__ import annotations
 
 import json
-import os
 import ssl
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-
+from typing import Any
 
 BASE_DIR = Path(__file__).resolve().parent
 REPORT_PATH = BASE_DIR / "council_evidence_report.md"
@@ -41,33 +39,33 @@ class Finding:
 
 @dataclass
 class EvidenceReport:
-    generated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-    findings: List[Finding] = field(default_factory=list)
+    generated_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+    findings: list[Finding] = field(default_factory=list)
     value_score: float = 0.0
     summary: str = ""
 
     def add(self, finding: Finding) -> None:
         self.findings.append(finding)
 
-    def rank(self) -> List[Finding]:
+    def rank(self) -> list[Finding]:
         order = {"critical": 0, "high": 1, "standard": 2}
         return sorted(self.findings, key=lambda f: (order.get(f.priority, 2), -f.confidence))
 
     def markdown(self) -> str:
         lines = [
-            f"# Council Evidence Report",
-            f"",
+            "# Council Evidence Report",
+            "",
             f"Generated: {self.generated_at}",
-            f"Mode: live-telemetry-backed findings",
+            "Mode: live-telemetry-backed findings",
             f"Findings: {len(self.findings)}",
             f"Value score: {self.value_score:.3f}",
-            f"",
-            f"## Summary",
-            f"",
+            "",
+            "## Summary",
+            "",
             f"{self.summary}",
-            f"",
-            f"## Findings",
-            f"",
+            "",
+            "## Findings",
+            "",
         ]
         for i, f in enumerate(self.rank(), 1):
             lines.extend([
@@ -77,14 +75,14 @@ class EvidenceReport:
                 f"- **Effort:** {f.effort}",
                 f"- **Confidence:** {f.confidence:.2f}",
                 f"- **Measurable:** {f.measurable}",
-                f"",
+                "",
                 f"{f.finding}",
-                f"",
+                "",
             ])
         return "\n".join(lines)
 
 
-def _https_get(base_url: str, path: str, timeout: float = 5.0) -> Optional[Dict[str, Any]]:
+def _https_get(base_url: str, path: str, timeout: float = 5.0) -> dict[str, Any] | None:
     url = f"{base_url.rstrip('/')}{path}"
     use_ssl = True
     if url.startswith("https://127.0.0.1") or url.startswith("https://localhost"):

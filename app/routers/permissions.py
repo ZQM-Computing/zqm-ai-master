@@ -7,13 +7,12 @@ Role-based access control and permission management.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
 
 from app.core.logger import get_logger
-from app.core.security import require_admin, get_current_token_payload
+from app.core.security import get_current_token_payload, require_admin
 from app.models.response import ZQM_AIResponse
 
 router = APIRouter(prefix="/api/permissions", tags=["Permissions"])
@@ -22,7 +21,7 @@ log = get_logger("router.permissions")
 
 # ── Permission definitions ────────────────────────────────────────────────────
 
-ROLES: Dict[str, Dict[str, Any]] = {
+ROLES: dict[str, dict[str, Any]] = {
     "admin": {
         "name": "Administrator",
         "description": "Full access to all The Void features and settings",
@@ -64,7 +63,7 @@ ROLES: Dict[str, Dict[str, Any]] = {
     },
 }
 
-PERMISSIONS: Dict[str, str] = {
+PERMISSIONS: dict[str, str] = {
     "tasks:read": "View tasks and results",
     "tasks:write": "Submit and cancel tasks",
     "tasks:cancel": "Cancel in-progress tasks",
@@ -90,7 +89,7 @@ PERMISSIONS: Dict[str, str] = {
     summary="List all permissions",
 )
 async def list_permissions(
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> ZQM_AIResponse:
     """Return all defined permissions in the The Void RBAC system."""
     perms = [{"id": k, "description": v} for k, v in PERMISSIONS.items()]
@@ -103,7 +102,7 @@ async def list_permissions(
     summary="List all roles",
 )
 async def list_roles(
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> ZQM_AIResponse:
     """Return all roles and their associated permissions."""
     roles_out = []
@@ -125,7 +124,7 @@ async def list_roles(
 )
 async def get_role(
     role_id: str,
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> ZQM_AIResponse:
     """Return details for a specific role."""
     from fastapi import HTTPException, status
@@ -147,8 +146,8 @@ async def get_role(
     summary="Check permissions for a user",
 )
 async def check_permissions(
-    request_body: Dict[str, Any],
-    auth: Dict[str, Any] = Depends(require_admin),
+    request_body: dict[str, Any],
+    auth: dict[str, Any] = Depends(require_admin),
 ) -> ZQM_AIResponse:
     """
     Check whether given roles grant specific permissions.
@@ -157,8 +156,8 @@ async def check_permissions(
     {"roles": ["user"], "permissions": ["tasks:write", "settings:write"]}
     ```
     """
-    roles: List[str] = request_body.get("roles", [])
-    check_perms: List[str] = request_body.get("permissions", [])
+    roles: list[str] = request_body.get("roles", [])
+    check_perms: list[str] = request_body.get("permissions", [])
 
     # Collect all granted permissions for given roles
     granted: set = set()

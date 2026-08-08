@@ -21,7 +21,8 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
-from typing import Any, AsyncIterator, Optional
+from collections.abc import AsyncIterator
+from typing import Any
 
 DEFAULT_PING_INTERVAL = 15.0   # < Traefik idle timeout (default 60s)
 DEFAULT_RECONNECT_MS = 3000
@@ -30,7 +31,7 @@ DEFAULT_RECONNECT_MS = 3000
 def sse_format(
     event_type: str,
     data: Any,
-    event_id: Optional[str] = None,
+    event_id: str | None = None,
     comment: bool = False,
 ) -> str:
     if comment:
@@ -94,7 +95,7 @@ async def enhanced_sse_stream(
         while not upstream_done.is_set():
             try:
                 await asyncio.wait_for(upstream_done.wait(), timeout=ping_interval)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 try:
                     await q.put(("ping", sse_format("", "", comment=True)))
                 except asyncio.QueueFull:
@@ -109,7 +110,7 @@ async def enhanced_sse_stream(
                 break
             try:
                 kind, frame = await asyncio.wait_for(q.get(), timeout=ping_interval)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 if upstream_done.is_set() and q.empty():
                     break
                 continue

@@ -1,10 +1,18 @@
 # The Void — Data Models
-from app.models.task import Task, TaskRequest, TaskResult, TaskStatus, CognitiveLevel
-from app.models.agent import Agent, AgentType, AgentStatus
-from app.models.response import ZQM_AIResponse, ErrorResponse, PaginatedResponse
+from app.models.agent import Agent, AgentStatus, AgentType
+from app.models.response import ErrorResponse, PaginatedResponse, ZQM_AIResponse
+from app.models.task import CognitiveLevel, Task, TaskRequest, TaskResult, TaskStatus
 
 __all__ = [
-    "Task", "TaskRequest", "TaskResult", "TaskStatus", "CognitiveLevel",
-    "Agent", "AgentType", "AgentStatus",
-    "ZQM_AIResponse", "ErrorResponse", "PaginatedResponse",
+    "Agent",
+    "AgentStatus",
+    "AgentType",
+    "CognitiveLevel",
+    "ErrorResponse",
+    "PaginatedResponse",
+    "Task",
+    "TaskRequest",
+    "TaskResult",
+    "TaskStatus",
+    "ZQM_AIResponse",
 ]

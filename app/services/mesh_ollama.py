@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
 
@@ -27,7 +27,7 @@ from mesh_connect import NODE_IPS
 
 # Default mesh topology: N2, N3, N4 are compute nodes with Ollama.
 # N1 is a management/gateway node without Ollama.
-DEFAULT_BACKENDS: List[Dict[str, Any]] = [
+DEFAULT_BACKENDS: list[dict[str, Any]] = [
     {"name": "N2", "url": f"http://{NODE_IPS['N2']}:11434", "local": False},
     {"name": "N3", "url": f"http://{NODE_IPS['N3']}:11434", "local": False},
     {"name": "N4", "url": f"http://{NODE_IPS['N4']}:11434", "local": False},
@@ -52,14 +52,14 @@ class OllamaUnavailable(Exception):
 
 
 class MeshOllamaRouter:
-    def __init__(self, backends: Optional[List[Dict[str, Any]]] = None) -> None:
+    def __init__(self, backends: list[dict[str, Any]] | None = None) -> None:
         self.backends = backends or DEFAULT_BACKENDS
-        self._health: Dict[str, bool] = {}
-        self._models: Dict[str, List[str]] = {}
-        self._model_index: Dict[str, List[str]] = {}
+        self._health: dict[str, bool] = {}
+        self._models: dict[str, list[str]] = {}
+        self._model_index: dict[str, list[str]] = {}
         self._last_check = 0.0
-        self._down_until: Dict[str, float] = {}
-        self._status_failures: Dict[str, int] = {}
+        self._down_until: dict[str, float] = {}
+        self._status_failures: dict[str, int] = {}
         self._lock = asyncio.Lock()
 
     async def refresh(self, force: bool = False) -> None:
@@ -68,9 +68,9 @@ class MeshOllamaRouter:
             if not force and self._last_check and (now - self._last_check) < 30:
                 return
             self._down_until = {k: v for k, v in self._down_until.items() if v > now}
-            health: Dict[str, bool] = {}
-            models: Dict[str, List[str]] = {}
-            index: Dict[str, List[str]] = {}
+            health: dict[str, bool] = {}
+            models: dict[str, list[str]] = {}
+            index: dict[str, list[str]] = {}
             await asyncio.gather(
                 *(self._check_one(b, health, models, index) for b in self.backends)
             )
@@ -85,8 +85,8 @@ class MeshOllamaRouter:
     # ---- health check ----
 
     async def _check_one(
-        self, b: Dict[str, str], health: Dict[str, bool], models: Dict[str, List[str]],
-        index: Dict[str, List[str]],
+        self, b: dict[str, str], health: dict[str, bool], models: dict[str, list[str]],
+        index: dict[str, list[str]],
     ) -> None:
         name = b["name"]
         headers = {}
@@ -158,7 +158,7 @@ class MeshOllamaRouter:
     def _is_down(self, name: str) -> bool:
         return self._down_until.get(name, 0.0) > time.monotonic()
 
-    def _ranked_backends(self, model: str) -> List[Dict[str, str]]:
+    def _ranked_backends(self, model: str) -> list[dict[str, str]]:
         have = self._model_index.get(model, [])
         ordered = []
         for b in self.backends:
@@ -170,7 +170,7 @@ class MeshOllamaRouter:
         return [b for b in self.backends
                 if self._health.get(b["name"], False) and not self._is_down(b["name"])]
 
-    def _degraded_backends(self) -> List[Dict[str, str]]:
+    def _degraded_backends(self) -> list[dict[str, str]]:
         out = []
         for b in self.backends:
             if self._health.get(b["name"], False) and not self._is_down(b["name"]) \
@@ -181,14 +181,14 @@ class MeshOllamaRouter:
 
     # ---- request dispatch ----
 
-    async def _post(self, b: Dict[str, str], model: str,
-                    messages: List[Dict[str, str]], timeout: float,
-                    opts: Dict[str, Any]) -> Dict[str, Any]:
-        last: Optional[Exception] = None
+    async def _post(self, b: dict[str, str], model: str,
+                    messages: list[dict[str, str]], timeout: float,
+                    opts: dict[str, Any]) -> dict[str, Any]:
+        last: Exception | None = None
         name = b["name"]
-        chat_supported: Optional[bool] = None
+        chat_supported: bool | None = None
 
-        def _prompt(msgs: List[Dict[str, str]]) -> str:
+        def _prompt(msgs: list[dict[str, str]]) -> str:
             return "\n".join(f"[{m.get('role','user')}] {m.get('content','')}" for m in msgs)
 
         for attempt in range(4):
@@ -262,10 +262,10 @@ class MeshOllamaRouter:
     async def chat(
         self,
         model: str,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         timeout: float = 60.0,
         **opts: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         await self.refresh()
         backends = self._ranked_backends(model)
         if not backends:
@@ -318,7 +318,7 @@ class MeshOllamaRouter:
 
     # ---- embeddings (full signature preserved for routers) ----
 
-    async def embed(self, model: str, text: str, timeout: float = 60.0) -> List[float]:
+    async def embed(self, model: str, text: str, timeout: float = 60.0) -> list[float]:
         await self.refresh()
         for name in list(self._health):
             b = next((x for x in self.backends if x["name"] == name), None)
@@ -347,10 +347,10 @@ class MeshOllamaRouter:
 
     # ---- catalog ----
 
-    async def list_models(self) -> Dict[str, Any]:
+    async def list_models(self) -> dict[str, Any]:
         await self.refresh()
         now = time.monotonic()
-        catalog: Dict[str, Any] = {"backends": []}
+        catalog: dict[str, Any] = {"backends": []}
         for b in self.backends:
             healthy = self._health.get(b["name"], False)
             down = self._is_down(b["name"])
@@ -372,7 +372,7 @@ class MeshOllamaRouter:
     # ---- internal helpers ----
 
     @staticmethod
-    def _pick_fallback_model(models: List[str]) -> Optional[str]:
+    def _pick_fallback_model(models: list[str]) -> str | None:
         if not models:
             return None
         for pref in ("qwen2.5:0.5b", "phi3:mini", "llama3.2:3b", "qwen2.5:3b", "mistral:7b", "llava:7b", "moondream:latest", "qwen3.6:latest"):

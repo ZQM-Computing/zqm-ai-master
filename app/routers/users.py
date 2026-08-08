@@ -7,12 +7,12 @@ User management and token generation.
 
 from __future__ import annotations
 
-import uuid
 import os
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+import uuid
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.core.logger import get_logger
@@ -35,18 +35,18 @@ log = get_logger("router.users")
 class UserRecord(BaseModel):
     user_id: str
     username: str
-    email: Optional[str] = None
-    roles: List[str] = Field(default_factory=list)
-    api_key: Optional[str] = None
-    api_key_hash: Optional[str] = None
+    email: str | None = None
+    roles: list[str] = Field(default_factory=list)
+    api_key: str | None = None
+    api_key_hash: str | None = None
     active: bool = True
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     hashed_password: str = ""
     failed_attempts: int = 0
-    locked_until: Optional[datetime] = None
+    locked_until: datetime | None = None
 
 
-_users: Dict[str, UserRecord] = {}
+_users: dict[str, UserRecord] = {}
 
 
 # ── Request/Response schemas ──────────────────────────────────────────────────
@@ -54,8 +54,8 @@ _users: Dict[str, UserRecord] = {}
 class UserCreate(BaseModel):
     username: str
     password: str
-    email: Optional[str] = None
-    roles: List[str] = Field(default_factory=lambda: ["user"])
+    email: str | None = None
+    roles: list[str] = Field(default_factory=lambda: ["user"])
 
 
 class UserLogin(BaseModel):
@@ -69,8 +69,8 @@ class TokenResponse(BaseModel):
     expires_in: int
     user_id: str
     username: str
-    roles: List[str]
-    refresh_token: Optional[str] = None
+    roles: list[str]
+    refresh_token: str | None = None
 
 
 # ── Auth hardening constants ───────────────────────────────────────────────────
@@ -106,7 +106,7 @@ async def login(credentials: UserLogin) -> ZQM_AIResponse:
             detail="Invalid username or password",
         )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if getattr(user, "locked_until", None) and now < user.locked_until:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -170,7 +170,7 @@ async def login(credentials: UserLogin) -> ZQM_AIResponse:
     summary="Get current user info",
 )
 async def get_me(
-    auth: Dict[str, Any] = Depends(get_current_user),
+    auth: dict[str, Any] = Depends(get_current_user),
 ) -> ZQM_AIResponse:
     """Return information about the currently authenticated user."""
     user_id = auth.get("sub")
@@ -202,7 +202,7 @@ async def get_me(
     summary="List all users",
 )
 async def list_users(
-    auth: Dict[str, Any] = Depends(require_admin),
+    auth: dict[str, Any] = Depends(require_admin),
 ) -> ZQM_AIResponse:
     """Return all registered users (admin only)."""
     if not _users:
@@ -231,7 +231,7 @@ async def list_users(
 )
 async def create_user(
     user_data: UserCreate,
-    auth: Dict[str, Any] = Depends(require_admin),
+    auth: dict[str, Any] = Depends(require_admin),
 ) -> ZQM_AIResponse:
     """Create a new user account (admin only)."""
     # Check username uniqueness
@@ -264,7 +264,7 @@ async def create_user(
 )
 async def generate_user_api_key(
     user_id: str,
-    auth: Dict[str, Any] = Depends(require_admin),
+    auth: dict[str, Any] = Depends(require_admin),
 ) -> ZQM_AIResponse:
     """Generate a new API key for a user."""
     user = _users.get(user_id)

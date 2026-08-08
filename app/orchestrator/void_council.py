@@ -16,13 +16,12 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 import re
 import ssl
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from app.core.logger import get_logger
 
@@ -42,7 +41,7 @@ log = get_logger("void-council")
 BASE_DIR = Path(__file__).resolve().parent
 
 
-def _json_get(url: str, timeout: float = 4.0) -> Optional[Dict[str, Any]]:
+def _json_get(url: str, timeout: float = 4.0) -> dict[str, Any] | None:
     req = urllib.request.Request(url, headers={"Accept": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -53,7 +52,7 @@ def _json_get(url: str, timeout: float = 4.0) -> Optional[Dict[str, Any]]:
     return None
 
 
-def _https_json_get(url: str, timeout: float = 4.0) -> Optional[Dict[str, Any]]:
+def _https_json_get(url: str, timeout: float = 4.0) -> dict[str, Any] | None:
     ctx = ssl.create_default_context()
     ca = BASE_DIR / "data" / "traefik" / "certs" / "zqm-mesh.crt"
     if ca.exists():
@@ -68,12 +67,12 @@ def _https_json_get(url: str, timeout: float = 4.0) -> Optional[Dict[str, Any]]:
     return None
 
 
-def _local_api(base_path: str = "http://127.0.0.1:8810") -> Optional[Dict[str, Any]]:
+def _local_api(base_path: str = "http://127.0.0.1:8810") -> dict[str, Any] | None:
     return _json_get(f"{base_path}/api/healthz", timeout=6.0)
 
 
-def _garden_evidence(base_path: str = "http://127.0.0.1:8810") -> List[str]:
-    out: List[str] = []
+def _garden_evidence(base_path: str = "http://127.0.0.1:8810") -> list[str]:
+    out: list[str] = []
     data = _json_get(f"{base_path}/api/garden/health", timeout=6.0)
     if data is None:
         out.append("EVIDENCE: /api/garden/health probe failed")
@@ -82,8 +81,8 @@ def _garden_evidence(base_path: str = "http://127.0.0.1:8810") -> List[str]:
     return out
 
 
-def _mesh_evidence(base_path: str = "http://127.0.0.1:8810") -> List[str]:
-    out: List[str] = []
+def _mesh_evidence(base_path: str = "http://127.0.0.1:8810") -> list[str]:
+    out: list[str] = []
     data = _json_get(f"{base_path}/api/mesh/nodes/health", timeout=6.0)
     if data is None:
         out.append("EVIDENCE: /api/mesh/nodes/health probe failed")
@@ -95,8 +94,8 @@ def _mesh_evidence(base_path: str = "http://127.0.0.1:8810") -> List[str]:
     return out
 
 
-def _status_code_evidence(base_path: str = "http://127.0.0.1:8810") -> List[str]:
-    out: List[str] = []
+def _status_code_evidence(base_path: str = "http://127.0.0.1:8810") -> list[str]:
+    out: list[str] = []
     for path in ["/api/status", "/api/garden/metrics"]:
         url = f"{base_path}{path}"
         try:
@@ -109,8 +108,8 @@ def _status_code_evidence(base_path: str = "http://127.0.0.1:8810") -> List[str]
     return out
 
 
-def _codebase_evidence() -> List[str]:
-    out: List[str] = []
+def _codebase_evidence() -> list[str]:
+    out: list[str] = []
     base_app = BASE_DIR.parent / "app"
     candidates = [
         base_app / "routers" / "status.py",
@@ -126,8 +125,8 @@ def _codebase_evidence() -> List[str]:
     return out
 
 
-def gather_council_evidence(base_path: str = "http://127.0.0.1:8810") -> List[str]:
-    parts: List[str] = []
+def gather_council_evidence(base_path: str = "http://127.0.0.1:8810") -> list[str]:
+    parts: list[str] = []
     try:
         parts.append("Live system evidence:")
         parts.extend(_garden_evidence(base_path))
@@ -143,7 +142,7 @@ def gather_council_evidence(base_path: str = "http://127.0.0.1:8810") -> List[st
     return parts
 
 
-COUNCIL_DOMAINS: Dict[str, Dict[str, Any]] = {
+COUNCIL_DOMAINS: dict[str, dict[str, Any]] = {
     "architecture": {
         "presiding": [AgentType.REASONING, AgentType.SYNTHESIS],
         "specialists": [
@@ -283,7 +282,7 @@ def _fingerprint(text: str) -> str:
     return normalized[:180]
 
 
-async def _pick(registry: Any, agent_type: Any, count: int = 1) -> List[Any]:
+async def _pick(registry: Any, agent_type: Any, count: int = 1) -> list[Any]:
     """Best-effort agent selection; falls back to []."""
     try:
         return await registry.select_best(agent_type=agent_type, count=count)
@@ -296,7 +295,7 @@ def _format_finding(
     specialist: str,
     finding: str,
     confidence: float = 0.5,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     return {
         "domain": domain,
         "specialist": specialist,
@@ -305,11 +304,11 @@ def _format_finding(
         "priority": _classify_priority(finding),
         "effort": _classify_effort(finding),
         "fingerprint": _fingerprint(finding),
-        "ts": datetime.now(timezone.utc).isoformat(),
+        "ts": datetime.now(UTC).isoformat(),
     }
 
 
-def _summarize(findings: List[Dict[str, Any]]) -> str:
+def _summarize(findings: list[dict[str, Any]]) -> str:
     return "; ".join(
         f"{f['domain']}:{f['specialist']}:{f['finding'][:100]}"
         for f in findings[-8:]
@@ -340,11 +339,11 @@ class VoidCouncil:
         registry: Any,
         settings: Any,
         max_history: int = 200,
-        history_path: Optional[str] = None,
+        history_path: str | None = None,
     ) -> None:
         self.registry = registry
         self.settings = settings
-        self._history: List[str] = []
+        self._history: list[str] = []
         self._max_history = max(1, max_history)
         self._idx = 0
         self._session_count = 0
@@ -355,12 +354,12 @@ class VoidCouncil:
             if history_path
             else Path(__file__).resolve().parent.parent / "void_council_history.jsonl"
         )
-        self._agent_performance: Dict[str, List[float]] = {}
-        self._metrics_channel: Optional[Any] = None
-        self._redis: Optional[Any] = None
-        self._observability: Optional[Any] = None
-        self._flatspace: Optional[Any] = None
-        self._garden: Optional[Any] = None
+        self._agent_performance: dict[str, list[float]] = {}
+        self._metrics_channel: Any | None = None
+        self._redis: Any | None = None
+        self._observability: Any | None = None
+        self._flatspace: Any | None = None
+        self._garden: Any | None = None
 
     @property
     def current_domain(self) -> str:
@@ -397,31 +396,32 @@ class VoidCouncil:
         self._idx += 1
         return self.current_domain
 
-    def _chairperson(self, charter: Dict[str, Any]) -> str:
+    def _chairperson(self, charter: dict[str, Any]) -> str:
         candidates = charter.get("presiding", [AgentType.REASONING])
         return getattr(candidates[self._session_count % len(candidates)], "value", str(candidates[0]))
 
-    def _scribe(self, charter: Dict[str, Any]) -> str:
+    def _scribe(self, charter: dict[str, Any]) -> str:
         candidates = charter.get("scribe", [AgentType.MEMORY])
         return getattr(candidates[self._session_count % len(candidates)], "value", str(candidates[0]))
 
     def _prompt(
         self,
         domain: str,
-        charter: Dict[str, Any],
+        charter: dict[str, Any],
         role: str,
         agent_name: str,
         recent_findings: str,
         chair: str,
         scribe: str,
-        evidence: Optional[List[str]] = None,
+        evidence: list[str] | None = None,
     ) -> str:
+        evidence_block = ""
         evidence_block = ""
         if evidence:
             evidence_block = "\n".join(evidence) + "\n\n"
         live_context = (
             "Live system evidence:\n"
-            "- Stack is FastAPI + Uvicorn on Windows/NSSM; routers include process, status, info, garden, flatspace, mesh_ops, quantum_llm_bridge, void_council.\n"
+            f"- Stack is FastAPI + Uvicorn on Windows/NSSM; routers include process, status, info, garden, flatspace, mesh_ops, quantum_llm_bridge, void_council; build {getattr(getattr(self, 'settings', None), 'app_version', 'unknown')}.\n"
             "- Recent changes: MeshNodeOperations wiring, mesh_ops router, resilient garden_service, garden node IP refresh.\n\n"
         )
         base = (
@@ -452,7 +452,7 @@ class VoidCouncil:
             )
         return evidence_block + live_context + base
 
-    async def _persist_session(self, record: Dict[str, Any]) -> None:
+    async def _persist_session(self, record: dict[str, Any]) -> None:
         try:
             self._history_path.parent.mkdir(parents=True, exist_ok=True)
             with self._history_path.open("a", encoding="utf-8") as f:
@@ -460,7 +460,7 @@ class VoidCouncil:
         except Exception as exc:
             log.debug("council history write failed", error=str(exc))
 
-    async def _apply_finding(self, finding: Dict[str, Any]) -> bool:
+    async def _apply_finding(self, finding: dict[str, Any]) -> bool:
         """Best-effort apply for a single finding. Returns True if handled."""
         action = finding.get("action", "patch")
         try:
@@ -527,7 +527,7 @@ class VoidCouncil:
         except Exception:
             return set()
 
-    def _score_session(self, findings: List[Dict[str, Any]], panel_size: int, quorum: int) -> float:
+    def _score_session(self, findings: list[dict[str, Any]], panel_size: int, quorum: int) -> float:
         """Compute session quality score 0..1."""
         if not findings:
             return 0.0
@@ -539,7 +539,7 @@ class VoidCouncil:
         specificity = sum(1.0 for f in findings if f.get("action") in ("patch", "config", "feature", "remove")) / max(1, len(findings))
         return min(1.0, coverage * 0.2 + confidence * 0.2 + quorum_ratio * 0.15 + priority_boost * 0.2 + novelty * 0.15 + specificity * 0.1)
 
-    def build_priority_queue(self, findings: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def build_priority_queue(self, findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Sort findings by priority × confidence for execution ordering."""
         priority_order = {"critical": 0, "high": 1, "standard": 2}
         return sorted(
@@ -550,7 +550,7 @@ class VoidCouncil:
             ),
         )
 
-    async def action_planner(self, findings: List[Dict[str, Any]]) -> Dict[str, Any]:
+    async def action_planner(self, findings: list[dict[str, Any]]) -> dict[str, Any]:
         """Create execution plan from findings."""
         queued = self.build_priority_queue(findings)
         plan = {
@@ -575,13 +575,13 @@ class VoidCouncil:
 
     async def convene(
         self,
-        domain: Optional[str] = None,
+        domain: str | None = None,
         *,
         force_domain: bool = False,
         min_confidence: float = 0.75,
         auto_apply: bool = False,
         cross_domain: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Convene one council session and return findings."""
         if domain is None:
             domain = self.current_domain if force_domain else self.current_domain
@@ -589,7 +589,7 @@ class VoidCouncil:
 
         # Build panel: presiding + specialists + scribe
         presiding = await _pick(self.registry, _pick_type(charter["presiding"]), 1)
-        specialists: List[Any] = []
+        specialists: list[Any] = []
         for at in charter["specialists"][:4]:
             specialists.extend(await _pick(self.registry, at, 1))
         scribe = await _pick(self.registry, _pick_type(charter["scribe"]), 1)
@@ -613,7 +613,7 @@ class VoidCouncil:
         current_scribe = self._scribe(charter)
         recent = await self._load_recent_findings()
         seen = await self._load_all_fingerprints()
-        findings: List[Dict[str, Any]] = []
+        findings: list[dict[str, Any]] = []
 
         evidence_lines = gather_council_evidence()
 
@@ -673,7 +673,7 @@ class VoidCouncil:
         applied = 0
         if auto_apply and findings:
             try:
-                from app.orchestrator import self_improve, self_expand
+                from app.orchestrator import self_expand, self_improve
                 novel = [f for f in findings if not f.get("duplicate")]
                 if novel:
                     blob = "\n".join(f["finding"] for f in novel)
@@ -703,7 +703,7 @@ class VoidCouncil:
             "quorum_met": len(panel) >= quorum,
             "quality_score": round(quality, 3),
             "duplicate_count": sum(1 for f in findings if f.get("duplicate")),
-            "ts": datetime.now(timezone.utc).isoformat(),
+            "ts": datetime.now(UTC).isoformat(),
         }
         await self._persist_session(record)
 
@@ -811,9 +811,9 @@ class VoidCouncil:
         auto_apply: bool = False,
         cross_domain_synthesis: bool = True,
         parallel: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Convene all 8 domains in sequence and return aggregate findings."""
-        results: Dict[str, Any] = {
+        results: dict[str, Any] = {
             "mode": "full_council",
             "domains": [],
             "total_findings": 0,
@@ -824,7 +824,7 @@ class VoidCouncil:
             "quality_score": 0.0,
             "cross_domain_insights": [],
         }
-        scores: List[float] = []
+        scores: list[float] = []
 
         if parallel:
             domains_list = list(_DOMAIN_ORDER)
@@ -876,16 +876,16 @@ class VoidCouncil:
 
     async def convene_emergency(
         self,
-        domains: List[str],
+        domains: list[str],
         *,
         min_confidence: float = 0.7,
         auto_apply: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Emergency cross-domain session for critical issues."""
         valid = [d for d in domains if d in COUNCIL_DOMAINS]
         if not valid:
             valid = ["reliability", "security"]
-        results: Dict[str, Any] = {
+        results: dict[str, Any] = {
             "mode": "emergency",
             "domains": [],
             "total_findings": 0,
@@ -907,7 +907,7 @@ class VoidCouncil:
         results["next_domain"] = self.current_domain
         return results
 
-    async def _cross_domain_synthesis(self, domain_sessions: List[Dict[str, Any]]) -> List[str]:
+    async def _cross_domain_synthesis(self, domain_sessions: list[dict[str, Any]]) -> list[str]:
         """Synthesize findings across all domains into higher-order insights."""
         if mesh_ollama is None:
             return []
@@ -940,7 +940,7 @@ class VoidCouncil:
         except Exception:
             return []
 
-    async def review_session_quality(self, limit: int = 20) -> Dict[str, Any]:
+    async def review_session_quality(self, limit: int = 20) -> dict[str, Any]:
         """Review recent council session quality trends."""
         rows = await self.review_history(limit=limit)
         if not rows:
@@ -961,7 +961,7 @@ class VoidCouncil:
             )[:5],
         }
 
-    async def review_history(self, limit: int = 20) -> List[Dict[str, Any]]:
+    async def review_history(self, limit: int = 20) -> list[dict[str, Any]]:
         if not self._history_path.exists():
             return []
         rows = []
@@ -979,7 +979,7 @@ class VoidCouncil:
         return rows
 
 
-def _clean_key_value_line(line: str) -> Optional[Tuple[str, str]]:
+def _clean_key_value_line(line: str) -> tuple[str, str] | None:
     """Strip markdown/bold markers and return key/value if recognized."""
     cleaned = line.strip()
     cleaned = re.sub(r"\*\*", "", cleaned)
@@ -1010,7 +1010,7 @@ def _is_generic_async_finding(text: str) -> bool:
     return False
 
 
-def _finding_references_evidence(text: str, evidence: List[str]) -> bool:
+def _finding_references_evidence(text: str, evidence: list[str]) -> bool:
     """Check whether the finding text addresses the specific injected evidence."""
     if not evidence:
         return True
@@ -1066,7 +1066,7 @@ def _finding_references_evidence(text: str, evidence: List[str]) -> bool:
     return endpoint_hits >= 2 or (endpoint_hits >= 1 and code_path_hits >= 1)
 
 
-def _evidence_based_fallback(domain: str, agent_name: str, evidence: Optional[List[str]] = None) -> Dict[str, Any]:
+def _evidence_based_fallback(domain: str, agent_name: str, evidence: list[str] | None = None) -> dict[str, Any]:
     """Generate a concrete, evidence-based finding from live evidence."""
     evidence_text = " ".join(evidence or []).lower()
     agent_lower = agent_name.lower()
@@ -1260,14 +1260,14 @@ def _evidence_based_fallback(domain: str, agent_name: str, evidence: Optional[Li
         "priority": "high",
         "effort": "patch",
         "fingerprint": _fingerprint(finding_text),
-        "ts": datetime.now(timezone.utc).isoformat(),
+        "ts": datetime.now(UTC).isoformat(),
         "duplicate": False,
     }
 
 
-def _parse_finding(domain: str, agent_name: str, text: str, evidence: Optional[List[str]] = None) -> Dict[str, Any]:
+def _parse_finding(domain: str, agent_name: str, text: str, evidence: list[str] | None = None) -> dict[str, Any]:
     """Parse structured finding from agent output."""
-    finding: Dict[str, Any] = {
+    finding: dict[str, Any] = {
         "domain": domain,
         "specialist": agent_name,
         "finding": text,
@@ -1276,7 +1276,7 @@ def _parse_finding(domain: str, agent_name: str, text: str, evidence: Optional[L
         "effort": "standard",
         "action": "patch",
         "fingerprint": _fingerprint(text),
-        "ts": datetime.now(timezone.utc).isoformat(),
+        "ts": datetime.now(UTC).isoformat(),
     }
     for line in text.splitlines():
         parsed = _clean_key_value_line(line)
@@ -1303,7 +1303,7 @@ def _parse_finding(domain: str, agent_name: str, text: str, evidence: Optional[L
     return finding
 
 
-def _pick_type(candidates: List[Any]) -> Any:
+def _pick_type(candidates: list[Any]) -> Any:
     """Pick first candidate that resolves to a real AgentType member."""
     for c in candidates:
         try:
@@ -1321,12 +1321,12 @@ def _pick_type(candidates: List[Any]) -> Any:
 async def convene_council(
     registry: Any,
     settings: Any,
-    domain: Optional[str] = None,
+    domain: str | None = None,
     *,
     force_domain: bool = False,
     min_confidence: float = 0.75,
     auto_apply: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Convene a Void Council session."""
     council = VoidCouncil(registry=registry, settings=settings)
     return await council.convene(
@@ -1343,7 +1343,7 @@ async def convene_full_council(
     *,
     min_confidence: float = 0.75,
     auto_apply: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Convene all council domains in sequence."""
     council = VoidCouncil(registry=registry, settings=settings)
     return await council.convene_full(

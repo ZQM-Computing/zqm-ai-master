@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request
 
-from app.core.config import settings
 from app.core.security import get_current_token_payload
 from app.models.response import ZQM_AIResponse
 

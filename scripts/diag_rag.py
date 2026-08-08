@@ -1,10 +1,10 @@
 """Diagnose RAG path with real runtime calls."""
 import asyncio
-import json
-from app.services.mesh_ollama import router as mesh_ollama
+
 from app.core.config import settings
-from app.services.flatspace_local import LocalFlatSpaceStore
 from app.routers.rag import _build_context
+from app.services.flatspace_local import LocalFlatSpaceStore
+from app.services.mesh_ollama import router as mesh_ollama
 
 
 async def main():

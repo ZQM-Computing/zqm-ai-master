@@ -8,9 +8,10 @@ Runtime introspection for the falsification protocol defenses.
 from __future__ import annotations
 
 import time
+from typing import Any
+
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
-from typing import Any, Dict, List, Optional
 
 from app.core.logger import get_logger
 from app.core.security import get_current_token_payload
@@ -33,21 +34,21 @@ class AuditResponse(BaseModel):
 
 
 class AuditRequest(BaseModel):
-    envelope: Optional[Dict[str, Any]] = None
-    working_memory: Optional[List[str]] = None
-    kv_cache: Optional[List[float]] = None
-    cumulative_error: Optional[float] = None
-    last_tool_output: Optional[Dict[str, Any]] = None
-    error_curve: Optional[List[float]] = None
-    seed: Optional[int] = None
-    constraints: Optional[List[str]] = None
-    world_snapshot: Optional[Dict[str, Any]] = None
-    world_baseline: Optional[Dict[str, Any]] = None
-    world_staleness_s: Optional[float] = None
-    world_staleness_threshold_s: Optional[float] = None
-    last_observation: Optional[Dict[str, Any]] = None
-    last_action: Optional[Dict[str, Any]] = None
-    action_world_delta: Optional[Dict[str, Any]] = None
+    envelope: dict[str, Any] | None = None
+    working_memory: list[str] | None = None
+    kv_cache: list[float] | None = None
+    cumulative_error: float | None = None
+    last_tool_output: dict[str, Any] | None = None
+    error_curve: list[float] | None = None
+    seed: int | None = None
+    constraints: list[str] | None = None
+    world_snapshot: dict[str, Any] | None = None
+    world_baseline: dict[str, Any] | None = None
+    world_staleness_s: float | None = None
+    world_staleness_threshold_s: float | None = None
+    last_observation: dict[str, Any] | None = None
+    last_action: dict[str, Any] | None = None
+    action_world_delta: dict[str, Any] | None = None
 
 AuditRequest.model_rebuild()
 

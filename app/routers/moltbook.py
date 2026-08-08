@@ -11,7 +11,6 @@ import hmac
 import json
 import logging
 import os
-from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Header, HTTPException, Request, status
 
@@ -22,7 +21,7 @@ logger = logging.getLogger("zqm_ai.moltbook")
 router = APIRouter(prefix="/api/webhooks", tags=["moltbook"])
 
 
-def _verify_signature(body: bytes, signature: Optional[str], secret: str) -> bool:
+def _verify_signature(body: bytes, signature: str | None, secret: str) -> bool:
     if not secret or not signature:
         return False
     expected = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
@@ -32,8 +31,8 @@ def _verify_signature(body: bytes, signature: Optional[str], secret: str) -> boo
 @router.post("/moltbook", summary="Moltbook webhook receiver")
 async def moltbook_webhook(
     request: Request,
-    x_moltbook_signature: Optional[str] = Header(None, alias="X-Moltbook-Signature"),
-    x_moltbook_event: Optional[str] = Header(None, alias="X-Moltbook-Event"),
+    x_moltbook_signature: str | None = Header(None, alias="X-Moltbook-Signature"),
+    x_moltbook_event: str | None = Header(None, alias="X-Moltbook-Event"),
 ):
     """
     Receive Moltbook platform events.

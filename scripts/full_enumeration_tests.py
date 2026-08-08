@@ -6,13 +6,9 @@ commercial layer, mesh/probe, packaging, compile, and service state.
 
 from __future__ import annotations
 
-import json
-import os
 import subprocess
-import sys
-import time
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 import requests
 
@@ -38,7 +34,7 @@ MESH_BAD_PATHS = {
 
 class TestSuite:
     def __init__(self) -> None:
-        self.results: List[Dict[str, Any]] = []
+        self.results: list[dict[str, Any]] = []
         self.token: str | None = None
 
     def _record(self, name: str, passed: bool, detail: str = "") -> None:

@@ -8,9 +8,7 @@ instead of being silently dropped.
 from __future__ import annotations
 
 import asyncio
-import json
-import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.core.logger import get_logger
 
@@ -23,9 +21,9 @@ MAX_RETRIES = 5
 
 class WriteQueue:
     def __init__(self) -> None:
-        self._queue: List[Dict[str, Any]] = []
-        self._retries: Dict[str, int] = {}
-        self._task: Optional[asyncio.Task] = None
+        self._queue: list[dict[str, Any]] = []
+        self._retries: dict[str, int] = {}
+        self._task: asyncio.Task | None = None
         self._flatspace = None
 
     def start(self, flatspace_service: Any) -> None:
@@ -40,7 +38,7 @@ class WriteQueue:
             except asyncio.CancelledError:
                 pass
 
-    def enqueue(self, record: Dict[str, Any]) -> None:
+    def enqueue(self, record: dict[str, Any]) -> None:
         if len(self._queue) >= MAX_QUEUE:
             self._queue.pop(0)
         self._queue.append(record)

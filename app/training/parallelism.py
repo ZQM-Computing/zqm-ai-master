@@ -8,13 +8,8 @@ Provides:
 """
 from __future__ import annotations
 
-import json
-import os
-import sys
-from typing import List, Optional
 
-
-def shard_model_layers(base_model: str, num_shards: int = 2) -> List[dict]:
+def shard_model_layers(base_model: str, num_shards: int = 2) -> list[dict]:
     """Split model layers across shards."""
     # Placeholder: real implementation depends on model config
     return [

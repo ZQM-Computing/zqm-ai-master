@@ -25,7 +25,7 @@ import re
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.core.logger import get_logger
 
@@ -43,12 +43,12 @@ _PATCH_RE = re.compile(
 
 # Placeholder / template guard (P9): reject prompt-template echoes such as
 # "<rel path under app/>" / "<exact old text>" so they never reach the ledger.
-_PLACEHOLDER_RE = re.compile(r"<[^>]+>|rel path under app|exact old text|exact new text", re.I)
+_PLACEHOLDER_RE = re.compile(r"<[^>]+>|rel path under app|exact old text|exact new text", re.IGNORECASE)
 def _is_placeholder(text):
     return bool(_PLACEHOLDER_RE.search(text or ""))
 
 
-def parse_structured_patch(text: str) -> Optional[Dict[str, str]]:
+def parse_structured_patch(text: str) -> dict[str, str] | None:
     """
     Extract a structured PATCH block, if the panel emitted one.
 
@@ -78,8 +78,8 @@ def parse_structured_patch(text: str) -> Optional[Dict[str, str]]:
 
 
 async def self_apply(
-    orchestrator: Any, patch: Dict[str, str]
-) -> Dict[str, Any]:
+    orchestrator: Any, patch: dict[str, str]
+) -> dict[str, Any]:
     """
     Safely apply a proposed patch (see module docstring for the contract).
     `orchestrator` must expose .flatspace (FLATSPACE store) and
@@ -87,8 +87,7 @@ async def self_apply(
     """
     app_root = Path(__file__).resolve().parent.parent  # app/
     rel = patch["file"].replace("\\", "/").lstrip("/")
-    if rel.startswith("app/"):
-        rel = rel[4:]
+    rel = rel.removeprefix("app/")
     target = (app_root / rel).resolve()
     if not str(target).startswith(str(app_root)):
         return {"applied": False, "reason": "path escapes app/ (rejected)"}
@@ -169,7 +168,7 @@ async def self_apply(
 
 
 async def try_apply_findings(
-    orchestrator: Any, findings: List[str]
+    orchestrator: Any, findings: list[str]
 ) -> None:
     """Parse structured patches from findings; apply if ZQM_SELF_APPLY is on."""
     if not SELF_APPLY_ON:

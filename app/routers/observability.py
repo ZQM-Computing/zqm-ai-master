@@ -9,9 +9,9 @@ Prometheus metrics exposition + observability health.
 from __future__ import annotations
 
 import time
-from typing import Any, Dict
+from typing import Any
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
 from app.core.logger import get_logger
@@ -37,10 +37,10 @@ def _safe_call(coro):
     "/health",
     summary="Observability service health",
 )
-async def observability_health(request: Request) -> Dict[str, Any]:
+async def observability_health(request: Request) -> dict[str, Any]:
     """Quick health check for the observability pipeline."""
     orch = getattr(request.app.state, "orchestrator", None)
-    deps: Dict[str, Any] = {
+    deps: dict[str, Any] = {
         "orchestrator": orch is not None,
         "observability_service": False,
         "prometheus_client": False,
@@ -48,7 +48,7 @@ async def observability_health(request: Request) -> Dict[str, Any]:
 
     prometheus_available = False
     try:
-        from prometheus_client import CollectorRegistry, generate_latest  # noqa: F401
+        from prometheus_client import CollectorRegistry, generate_latest
 
         prometheus_available = True
     except Exception:

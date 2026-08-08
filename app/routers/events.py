@@ -7,14 +7,13 @@ Wires the in-process EventBus to an HTTP endpoint.
 from __future__ import annotations
 
 import asyncio
-from typing import AsyncGenerator
 
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 
 from app.core.event_bus import bus
-from app.core.sse import enhanced_sse_stream
 from app.core.logger import get_logger
+from app.core.sse import enhanced_sse_stream
 
 router = APIRouter()
 log = get_logger("router.events")

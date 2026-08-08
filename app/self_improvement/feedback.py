@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import os
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 def _feedback_path() -> str:
@@ -14,10 +14,10 @@ def _feedback_path() -> str:
 def collect_feedback(
     query: str,
     response: str,
-    rating: Optional[int] = None,
-    feedback_text: Optional[str] = None,
+    rating: int | None = None,
+    feedback_text: str | None = None,
     user_id: str = "anonymous",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     record = {
         "timestamp": datetime.utcnow().isoformat() + "Z",
         "user_id": user_id,
@@ -33,11 +33,11 @@ def collect_feedback(
     return {"status": "recorded", "record": record}
 
 
-def summarize_feedback(limit: int = 100) -> Dict[str, Any]:
+def summarize_feedback(limit: int = 100) -> dict[str, Any]:
     path = _feedback_path()
     if not os.path.exists(path):
         return {"count": 0, "average_rating": None}
-    records: List[Dict[str, Any]] = []
+    records: list[dict[str, Any]] = []
     with open(path, "r", encoding="utf-8") as f:
         for i, line in enumerate(f):
             if i >= limit:

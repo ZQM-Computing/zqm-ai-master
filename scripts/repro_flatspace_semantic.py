@@ -1,8 +1,8 @@
 """Independent repro of local semantic search path."""
 import json
+import math
 import sqlite3
 import urllib.request
-import math
 
 DB_PATH = r"C:\Void\ZQM-AI-Master\app\flatspace_local.db"
 OLLAMA_EMBED = "http://127.0.0.1:11434/api/embeddings"

@@ -42,15 +42,16 @@ The Void AI Orchestration System — local-first RAG, reasoning, mesh ops, and c
 
 This repo integrates with `zqm-intel-platforms` for shared OSINT/CTI/SIEM/Windows-telemetry primitives.
 
-- Evidence ingestion: council findings can be mirrored into flatspace/observability/garden/redis via `initialize_integrations()`.
+- Evidence ingestion: council findings are mirrored into flatspace/observability/garden/redis via `initialize_integrations()`.
 - Telemetry routing: observability events, council session summaries, and mesh metrics are pushed to the intel platform through optional service hooks in `app/orchestrator/void_council.py`.
 - Operational handoff: `scripts/verify_falsification_integration.py` validates cross-system consistency between Void outputs and intel platform expectations.
+- CLI bridge: `zqm-ai-master council-domains`, `council-history`, `council-convene`, `void-talk`, and `self-improve` expose the integration surface without touching raw HTTP.
 
-See `docs/VOID_INTEGRATION.md` for wiring and verification.
+See `docs/VOID_INTEGRATION.md` for wiring, runtime checks, and operator commands.
 
 ## License
 
-MIT unless otherwise noted in submodules.
+Apache-2.0
 
 ## Contact
 
@@ -79,4 +80,11 @@ zqm-ai-master logs --tail 100
 zqm-ai-master logs --follow
 zqm-ai-master test
 zqm-ai-master version
+zqm-ai-master void-version --host 127.0.0.1 --port 8808
+zqm-ai-master council-domains --host 127.0.0.1 --port 8808
+zqm-ai-master council-history --host 127.0.0.1 --port 8808 --limit 20
+zqm-ai-master council-convene --host 127.0.0.1 --port 8808 --domain reliability --auto-apply
+zqm-ai-master void-talk --host 127.0.0.1 --port 8808 --message "check integrations"
+zqm-ai-master self-improve --host 127.0.0.1 --port 8808
 ```
+

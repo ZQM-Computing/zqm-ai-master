@@ -40,10 +40,12 @@ import asyncio
 import json
 import re
 import subprocess
-from datetime import datetime, timezone
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple
+from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
+from typing import Any
 
 import httpx
+
 from app.core.config import settings
 from app.core.logger import get_logger
 from app.models.agent import AgentCapability
@@ -55,7 +57,7 @@ log = get_logger("agent-runtime")
 
 # ── Types ────────────────────────────────────────────────────────────────────
 
-ToolFn = Callable[[Dict[str, Any]], Awaitable[Any]]
+ToolFn = Callable[[dict[str, Any]], Awaitable[Any]]
 CallModelFn = Callable[..., Awaitable[str]]
 
 
@@ -83,7 +85,7 @@ _garden = GardenService()
 _obs = ObservabilityService()
 
 
-async def _t_flatspace_search(args: Dict[str, Any]) -> Any:
+async def _t_flatspace_search(args: dict[str, Any]) -> Any:
     return await _flatspace.search(
         query=str(args.get("query", "")),
         tier=str(args.get("tier", "bitgarden")),
@@ -91,16 +93,16 @@ async def _t_flatspace_search(args: Dict[str, Any]) -> Any:
     )
 
 
-async def _t_flatspace_retrieve(args: Dict[str, Any]) -> Any:
+async def _t_flatspace_retrieve(args: dict[str, Any]) -> Any:
     return await _flatspace.retrieve(
         key=str(args.get("key", "")),
         tier=str(args.get("tier", "bitgarden")),
     )
 
 
-async def _t_flatspace_store(args: Dict[str, Any]) -> Any:
+async def _t_flatspace_store(args: dict[str, Any]) -> Any:
     return await _flatspace.store(
-        key=str(args.get("key", f"agent:{datetime.now(timezone.utc).isoformat()}")),
+        key=str(args.get("key", f"agent:{datetime.now(UTC).isoformat()}")),
         value=args.get("value", {}),
         tier=str(args.get("tier", "bitgarden")),
     )
@@ -112,31 +114,31 @@ def _quantum_bridge():
     return _b
 
 
-async def _t_quantum_verify(args: Dict[str, Any]) -> Any:
+async def _t_quantum_verify(args: dict[str, Any]) -> Any:
     return _quantum_bridge()._run("verify")
 
 
-async def _t_quantum_infer(args: Dict[str, Any]) -> Any:
+async def _t_quantum_infer(args: dict[str, Any]) -> Any:
     return _quantum_bridge()._run("infer", json.dumps(args or {}))
 
 
-async def _t_quantum_retrieve(args: Dict[str, Any]) -> Any:
+async def _t_quantum_retrieve(args: dict[str, Any]) -> Any:
     return _quantum_bridge()._run("retrieve", json.dumps(args or {}))
 
 
-async def _t_quantum_models(args: Dict[str, Any]) -> Any:
+async def _t_quantum_models(args: dict[str, Any]) -> Any:
     return _quantum_bridge()._run("models")
 
 
-async def _t_quantum_nodes(args: Dict[str, Any]) -> Any:
+async def _t_quantum_nodes(args: dict[str, Any]) -> Any:
     return _quantum_bridge()._run("nodes")
 
 
-async def _t_garden_metrics(args: Dict[str, Any]) -> Any:
+async def _t_garden_metrics(args: dict[str, Any]) -> Any:
     return await _garden.get_node_metrics()
 
 
-async def _t_garden_submit(args: Dict[str, Any]) -> Any:
+async def _t_garden_submit(args: dict[str, Any]) -> Any:
     return await _garden.submit_job(
         task_id=str(args.get("task_id", "agent-task")),
         task_type=str(args.get("task_type", "ai_inference")),
@@ -145,7 +147,7 @@ async def _t_garden_submit(args: Dict[str, Any]) -> Any:
     )
 
 
-async def _t_ollama_models(args: Dict[str, Any]) -> Any:
+async def _t_ollama_models(args: dict[str, Any]) -> Any:
     """Mesh-wide model catalog (aggregated across N1/N2/N3/N4 Ollama)."""
     from app.services.mesh_ollama import router as mesh_ollama
     try:
@@ -164,7 +166,7 @@ async def _t_ollama_models(args: Dict[str, Any]) -> Any:
             return {"models": models, "count": len(models), "error": str(exc)}
 
 
-async def _t_observability_log(args: Dict[str, Any]) -> Any:
+async def _t_observability_log(args: dict[str, Any]) -> Any:
     await _obs.log_event(
         event_type=str(args.get("event", "agent_action")),
         payload=args.get("payload", {}),
@@ -172,7 +174,7 @@ async def _t_observability_log(args: Dict[str, Any]) -> Any:
     return {"logged": True}
 
 
-async def _t_http_get(args: Dict[str, Any]) -> Any:
+async def _t_http_get(args: dict[str, Any]) -> Any:
     """External reach — gated by the self-hosted mandate."""
     if not settings.allow_external_providers:
         raise PermissionError(
@@ -200,7 +202,7 @@ _ZQM_MCP_VENV_PY = r"C:/Users/zqmco/zqm-mcp/.venv/Scripts/python.exe"
 _ZQM_TOOLS_CLI = r"C:/temp/zqm_tools_cli.py"
 
 
-async def _t_zqm_tool(tool_name: str, args: Dict[str, Any]) -> Any:
+async def _t_zqm_tool(tool_name: str, args: dict[str, Any]) -> Any:
     """Generic executor for any zqm-local-tools bridge tool."""
     try:
         proc = await asyncio.to_thread(
@@ -220,7 +222,7 @@ async def _t_zqm_tool(tool_name: str, args: Dict[str, Any]) -> Any:
 
 
 def _zqm_tool_fn(tool_name: str):
-    async def _fn(args: Dict[str, Any]) -> Any:
+    async def _fn(args: dict[str, Any]) -> Any:
         return await _t_zqm_tool(tool_name, args)
     return _fn
 
@@ -236,7 +238,7 @@ _HERMES_VENV_PY = (
 _MESH_OP = r"C:/temp/mesh_op.py"
 
 
-async def _t_mesh_publish(args: Dict[str, Any]) -> Any:
+async def _t_mesh_publish(args: dict[str, Any]) -> Any:
     """Publish a state/message to the mesh (SMB broker share + redis pub).
 
     args: {topic: str, payload: any, target: "ALL"|"N1"|"N2"|"N3"|"N4"}
@@ -257,7 +259,7 @@ async def _t_mesh_publish(args: Dict[str, Any]) -> Any:
         return {"error": f"mesh_publish failed: {exc}"}
 
 
-async def _t_mesh_read(args: Dict[str, Any]) -> Any:
+async def _t_mesh_read(args: dict[str, Any]) -> Any:
     """Read a mesh state/message doc written by a peer or this Void.
 
     args: {topic: str, target: "N1"|"N2"|"N3"|"N4" (default N4)}
@@ -278,7 +280,7 @@ async def _t_mesh_read(args: Dict[str, Any]) -> Any:
 
 # ── Registry: capability -> tools ─────────────────────────────────────────────
 
-TOOLS: Dict[str, Tool] = {
+TOOLS: dict[str, Tool] = {
     "flatspace_search": Tool("flatspace_search", "Search FLATSPACE tiered memory by query.", AgentCapability.VECTOR_SEARCH, _t_flatspace_search),
     "flatspace_retrieve": Tool("flatspace_retrieve", "Retrieve a stored FLATSPACE record by key.", AgentCapability.DATABASE_QUERY, _t_flatspace_retrieve),
     "flatspace_store": Tool("flatspace_store", "Store a record into a FLATSPACE tier.", AgentCapability.DATABASE_QUERY, _t_flatspace_store),
@@ -307,7 +309,7 @@ TOOLS: Dict[str, Tool] = {
 }
 
 # Which capabilities unlock which tools
-CAPABILITY_TOOLS: Dict[AgentCapability, List[str]] = {
+CAPABILITY_TOOLS: dict[AgentCapability, list[str]] = {
     AgentCapability.VECTOR_SEARCH: ["flatspace_search"],
     AgentCapability.DATABASE_QUERY: ["flatspace_retrieve", "flatspace_store", "flatspace_search"],
     AgentCapability.API_CALL: ["garden_submit", "ollama_models", "garden_metrics", "mesh_publish", "mesh_read", "ollama_model_list",
@@ -318,14 +320,14 @@ CAPABILITY_TOOLS: Dict[AgentCapability, List[str]] = {
 }
 
 
-def tools_for_agent(capabilities: List[AgentCapability]) -> List[Tool]:
+def tools_for_agent(capabilities: list[AgentCapability]) -> list[Tool]:
     """Resolve the tools an agent may use from its declared capabilities."""
-    names: List[str] = []
+    names: list[str] = []
     for cap in capabilities:
         names.extend(CAPABILITY_TOOLS.get(cap, []))
     # de-dup, preserve order
     seen = set()
-    out: List[Tool] = []
+    out: list[Tool] = []
     for n in names:
         if n not in seen and n in TOOLS:
             seen.add(n)
@@ -341,7 +343,7 @@ _ACTION_RE = re.compile(
 )
 
 
-def parse_action(text: str) -> Optional[Tuple[str, Dict[str, Any]]]:
+def parse_action(text: str) -> tuple[str, dict[str, Any]] | None:
     m = _ACTION_RE.search(text)
     if not m:
         return None
@@ -353,7 +355,7 @@ def parse_action(text: str) -> Optional[Tuple[str, Dict[str, Any]]]:
     return name, args
 
 
-def _tool_spec_block(tools: List[Tool], request_input: str = "") -> str:
+def _tool_spec_block(tools: list[Tool], request_input: str = "") -> str:
     if not tools:
         return ""
     lines = "\n".join(t.spec() for t in tools)
@@ -425,7 +427,7 @@ def _tool_spec_block(tools: List[Tool], request_input: str = "") -> str:
 
 # ── Main entry: run an agent with tool reach ───────────────────────────────────
 
-_TRIGGER_KEYWORDS: Dict[str, List[str]] = {
+_TRIGGER_KEYWORDS: dict[str, list[str]] = {
     "ollama_models": ["model", "ollama", "list models", "available model", "what can i run", "which models"],
     "garden_metrics": ["garden", "node metric", "gpu", "compute node", "cluster status", "resource", "node status"],
     "garden_submit": ["submit job", "run job", "distribute", "inference job"],
@@ -447,7 +449,7 @@ _TRIGGER_KEYWORDS: Dict[str, List[str]] = {
 }
 
 
-def resolve_preferred_tool(request_input: str, available: List[Tool]) -> Optional[Tool]:
+def resolve_preferred_tool(request_input: str, available: list[Tool]) -> Tool | None:
     """
     Deterministic tool trigger: if the request clearly matches a tool AND
     that tool is in the agent's available set, return it. This guarantees
@@ -463,7 +465,7 @@ def resolve_preferred_tool(request_input: str, available: List[Tool]) -> Optiona
     return None
 
 
-def _system_tools_for_text(request_input: str) -> List[Tool]:
+def _system_tools_for_text(request_input: str) -> list[Tool]:
     """
     Return the zqm-local-tools system Tools implied by the request text, using
     the same keyword map as resolve_preferred_tool. Used by run_agent_with_tools
@@ -473,7 +475,7 @@ def _system_tools_for_text(request_input: str) -> List[Tool]:
     NLP/Reasoning agents with no capabilities). Empty list if no match.
     """
     text = (request_input or "").lower()
-    out: List[Tool] = []
+    out: list[Tool] = []
     for name, kws in _TRIGGER_KEYWORDS.items():
         if name in TOOLS and any(kw in text for kw in kws):
             t = TOOLS.get(name)
@@ -511,12 +513,12 @@ async def _retrieve_memory_context(query: str, limit: int = 5) -> str:
 async def run_agent_with_tools(
     agent,
     request_input: str,
-    context: Optional[Dict[str, Any]],
+    context: dict[str, Any] | None,
     call_model: CallModelFn,
     max_tool_rounds: int = 2,
-    tools: Optional[List[Tool]] = None,
-    input_schema: Optional[Dict[str, Any]] = None,
-) -> Tuple[str, List[Dict[str, Any]]]:
+    tools: list[Tool] | None = None,
+    input_schema: dict[str, Any] | None = None,
+) -> tuple[str, list[dict[str, Any]]]:
     """
     Run one agent, giving it real reach into The Void's systems via tools.
 
@@ -552,7 +554,7 @@ async def run_agent_with_tools(
     if system_tools:
         known = {t.name for t in tools}
         tools = tools + [t for t in system_tools if t.name not in known]
-    tool_trace: List[Dict[str, Any]] = []
+    tool_trace: list[dict[str, Any]] = []
 
     system_prompt = (agent.system_prompt or "") + _tool_spec_block(tools, request_input)
 
@@ -648,13 +650,13 @@ async def run_agent_with_tools(
     return current, tool_trace, None, total_usage
 
 
-def _merge_usage(target: Dict[str, int], source: Dict[str, int]) -> None:
+def _merge_usage(target: dict[str, int], source: dict[str, int]) -> None:
     """Merge token usage dicts in-place."""
     for key, value in source.items():
         target[key] = int(target.get(key, 0) or 0) + int(value or 0)
 
 
-def _validate_tool_args(tool_name: str, args: Dict[str, Any], schema: Dict[str, Any]) -> Tuple[bool, str]:
+def _validate_tool_args(tool_name: str, args: dict[str, Any], schema: dict[str, Any]) -> tuple[bool, str]:
     """
     Best-effort input-schema validation for tool arguments.
 
@@ -702,7 +704,7 @@ _OFFPLATFORM_RE = re.compile(
 )
 
 
-def scan_off_platform_refs(text: str) -> List[Dict[str, Any]]:
+def scan_off_platform_refs(text: str) -> list[dict[str, Any]]:
     """
     Extract off-platform references from free text: URLs, @handles,
     hex addresses, invoice/contract/ticket IDs. Used for audit, not blocking.

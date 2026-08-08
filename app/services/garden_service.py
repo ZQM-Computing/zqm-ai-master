@@ -17,10 +17,9 @@ from __future__ import annotations
 
 import asyncio
 import random
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.core.config import settings
 from app.core.logger import get_logger
@@ -51,11 +50,11 @@ class GardenService:
     def __init__(self) -> None:
         self._base_url = settings.garden_endpoint.rsplit("/api/", 1)[0]
         self._timeout = settings.garden_timeout
-        self._online_nodes: List[str] = []
+        self._online_nodes: list[str] = []
 
     # ── Health ────────────────────────────────────────────────────────────────
 
-    def _endpoint(self, node: Dict[str, Any], path: str) -> str:
+    def _endpoint(self, node: dict[str, Any], path: str) -> str:
         port = node.get("api_port", "8808")
         return f"http://{node['ip']}:{port}{path}"
 
@@ -70,7 +69,7 @@ class GardenService:
         except Exception:
             return False
 
-    async def get_online_nodes(self) -> List[str]:
+    async def get_online_nodes(self) -> list[str]:
         """Return IDs of currently reachable Garden nodes with caching."""
         try:
             results = await asyncio.gather(
@@ -87,7 +86,7 @@ class GardenService:
         except Exception:
             return self._online_nodes or []
 
-    async def _ping_node(self, node: Dict[str, Any]) -> bool:
+    async def _ping_node(self, node: dict[str, Any]) -> bool:
         try:
             async with httpx.AsyncClient(timeout=3) as client:
                 if node.get("node_type") == "storage":
@@ -100,13 +99,13 @@ class GardenService:
 
     # ── Node Operations ───────────────────────────────────────────────────────
 
-    async def get_node_health_snapshot(self) -> List[Dict[str, Any]]:
+    async def get_node_health_snapshot(self) -> list[dict[str, Any]]:
         """Return richer health snapshots for every configured node."""
         results = await asyncio.gather(
             *[self._probe_node(node) for node in self.GARDEN_NODES],
             return_exceptions=True,
         )
-        snapshot: List[Dict[str, Any]] = []
+        snapshot: list[dict[str, Any]] = []
         for node, result in zip(self.GARDEN_NODES, results):
             if isinstance(result, Exception):
                 snapshot.append({
@@ -119,7 +118,7 @@ class GardenService:
                 snapshot.append(result)
         return snapshot
 
-    async def _probe_node(self, node: Dict[str, Any]) -> Dict[str, Any]:
+    async def _probe_node(self, node: dict[str, Any]) -> dict[str, Any]:
         if node.get("node_type") == "storage":
             endpoint = self._endpoint(node, "/")
             health_path = "/"
@@ -129,7 +128,7 @@ class GardenService:
         try:
             async with httpx.AsyncClient(timeout=3) as client:
                 resp = await client.get(endpoint)
-                data: Dict[str, Any] = {}
+                data: dict[str, Any] = {}
                 try:
                     data = resp.json()
                 except Exception:
@@ -161,10 +160,10 @@ class GardenService:
                 "health_path": health_path,
             }
 
-    async def collect_node_metrics(self) -> Dict[str, Any]:
+    async def collect_node_metrics(self) -> dict[str, Any]:
         """Aggregate metrics across all nodes with per-node fallback."""
         raw = await self.get_node_metrics()
-        aggregated: Dict[str, Any] = {
+        aggregated: dict[str, Any] = {
             "nodes_total": len(raw),
             "nodes_online": 0,
             "nodes_offline": 0,
@@ -184,8 +183,8 @@ class GardenService:
         self,
         *,
         gpu_required: bool = False,
-        preferred_node: Optional[str] = None,
-    ) -> Optional[Dict[str, Any]]:
+        preferred_node: str | None = None,
+    ) -> dict[str, Any] | None:
         """Pick the best node by health + capability, not just first online."""
         if preferred_node:
             for n in self.GARDEN_NODES:
@@ -193,7 +192,7 @@ class GardenService:
                     healthy = await self._ping_node(n)
                     if healthy:
                         return n
-        candidates: List[tuple[bool, Dict[str, Any]]] = []
+        candidates: list[tuple[bool, dict[str, Any]]] = []
         for n in self.GARDEN_NODES:
             if gpu_required and not n.get("gpu"):
                 continue
@@ -207,7 +206,7 @@ class GardenService:
             return None
         return random.choice(healthy_nodes)
 
-    async def migrate_job(self, job_id: str, from_node: str, to_node: str) -> Dict[str, Any]:
+    async def migrate_job(self, job_id: str, from_node: str, to_node: str) -> dict[str, Any]:
         """Best-effort job migration signal between garden nodes."""
         return {
             "job_id": job_id,
@@ -217,7 +216,7 @@ class GardenService:
             "note": "Migration is advisory; actual replay depends on target node runtime.",
         }
 
-    async def convene_cross_node_action(self, action: Dict[str, Any]) -> Dict[str, Any]:
+    async def convene_cross_node_action(self, action: dict[str, Any]) -> dict[str, Any]:
         """Dispatch an action to the best node with failover."""
         task_id = action.get("task_id", "unknown")
         gpu_required = action.get("gpu_required", False)
@@ -248,11 +247,11 @@ class GardenService:
         self,
         task_id: str,
         task_type: str,
-        payload: Dict[str, Any],
+        payload: dict[str, Any],
         strategy: str = "round_robin",
-        preferred_node: Optional[str] = None,
+        preferred_node: str | None = None,
         gpu_required: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Submit a compute job to the ZQM Garden.
 
@@ -277,7 +276,7 @@ class GardenService:
             "zqm_ai_id": settings.zqm_ai_id,
         }
 
-        async def _post_to(node_ip: str, port: str) -> Dict[str, Any]:
+        async def _post_to(node_ip: str, port: str) -> dict[str, Any]:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
                 resp = await client.post(
                     f"http://{node_ip}:{port}/api/garden/coordinate",
@@ -342,7 +341,7 @@ class GardenService:
             "message": "Garden unavailable: all online fallback nodes errored",
         }
 
-    async def get_job_status(self, job_id: str) -> Dict[str, Any]:
+    async def get_job_status(self, job_id: str) -> dict[str, Any]:
         """Check the status of a submitted Garden job."""
         try:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
@@ -356,7 +355,7 @@ class GardenService:
             log.warning("Garden job status check failed", job_id=job_id, error=str(exc))
             return {"job_id": job_id, "status": "unknown", "error": str(exc)}
 
-    async def get_node_metrics(self) -> List[Dict[str, Any]]:
+    async def get_node_metrics(self) -> list[dict[str, Any]]:
         """Fetch resource metrics from all Garden nodes with resilience."""
         nodes = getattr(self, "GARDEN_NODES", [])
         if not nodes:
@@ -367,7 +366,7 @@ class GardenService:
         )
         return [r for r in results if isinstance(r, dict)]
 
-    async def _get_node_metrics(self, node: Dict[str, Any]) -> Dict[str, Any]:
+    async def _get_node_metrics(self, node: dict[str, Any]) -> dict[str, Any]:
         try:
             async with httpx.AsyncClient(timeout=5) as client:
                 resp = await client.get(

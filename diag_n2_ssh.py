@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Diagnostics for N2 Ollama hang and N1/N4 SSH channel issues."""
-import os, time, json
+import json
+import os
+import time
 import urllib.request
+
 import paramiko
 
 N2 = "192.168.1.31"

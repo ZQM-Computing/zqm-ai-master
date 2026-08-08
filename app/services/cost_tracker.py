@@ -6,10 +6,8 @@ Ollama local models: $0.00 (self-hosted).
 """
 from __future__ import annotations
 
-from typing import Dict, Optional
-
 # Per-million-token prices, USD
-_MODEL_PRICING: Dict[str, Dict[str, float]] = {
+_MODEL_PRICING: dict[str, dict[str, float]] = {
     # OpenAI
     "gpt-4o": {"input": 2.50, "output": 10.00},
     "gpt-4o-mini": {"input": 0.15, "output": 0.60},
@@ -28,7 +26,7 @@ _MODEL_PRICING: Dict[str, Dict[str, float]] = {
 }
 
 # Provider-to-pricing-group mapping
-_PROVIDER_DEFAULT: Dict[str, str] = {
+_PROVIDER_DEFAULT: dict[str, str] = {
     "openai": "openai",
     "anthropic": "anthropic",
     "google": "google",
@@ -36,7 +34,7 @@ _PROVIDER_DEFAULT: Dict[str, str] = {
 }
 
 
-def get_model_pricing(model: Optional[str], provider: Optional[str]) -> Dict[str, float]:
+def get_model_pricing(model: str | None, provider: str | None) -> dict[str, float]:
     """Return per-million-token pricing for a model/provider pair. Defaults to $0."""
     if not model:
         return {"input": 0.0, "output": 0.0}
@@ -59,10 +57,10 @@ def get_model_pricing(model: Optional[str], provider: Optional[str]) -> Dict[str
 
 
 def estimate_cost(
-    model: Optional[str],
-    provider: Optional[str],
-    tokens_input: Optional[int],
-    tokens_output: Optional[int],
+    model: str | None,
+    provider: str | None,
+    tokens_input: int | None,
+    tokens_output: int | None,
 ) -> float:
     """Estimate task cost in USD from token usage."""
     pricing = get_model_pricing(model, provider)

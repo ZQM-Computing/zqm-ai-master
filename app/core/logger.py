@@ -10,14 +10,12 @@ from __future__ import annotations
 
 import logging
 import logging.handlers
-import os
 import sys
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 import structlog
 from structlog.types import EventDict, WrappedLogger
-
 
 # ── Custom processors ─────────────────────────────────────────────────────────
 
@@ -39,7 +37,7 @@ def drop_color_message_key(logger: WrappedLogger, method_name: str, event_dict: 
 def configure_logging(
     level: str = "INFO",
     fmt: str = "json",
-    log_file: Optional[str] = None,
+    log_file: str | None = None,
 ) -> None:
     """
     Configure structlog + stdlib logging.
@@ -133,7 +131,7 @@ class ZQM_AILogger:
     def __init__(self, component: str, **context: Any) -> None:
         self._logger = get_logger(component, component=component, **context)
 
-    def bind(self, **kwargs: Any) -> "ZQM_AILogger":
+    def bind(self, **kwargs: Any) -> ZQM_AILogger:
         self._logger = self._logger.bind(**kwargs)
         return self
 

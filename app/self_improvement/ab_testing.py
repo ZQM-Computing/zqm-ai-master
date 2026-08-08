@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
@@ -16,11 +16,11 @@ class ABTestResult:
 
 
 class ABTest:
-    def __init__(self, name: str, variants: List[str], traffic_split: Optional[List[float]] = None) -> None:
+    def __init__(self, name: str, variants: list[str], traffic_split: list[float] | None = None) -> None:
         self.name = name
         self.variants = variants
         self.traffic_split = traffic_split or [1.0 / len(variants)] * len(variants)
-        self.results: Dict[str, List[bool]] = {v: [] for v in variants}
+        self.results: dict[str, list[bool]] = {v: [] for v in variants}
 
     def assign(self) -> str:
         return random.choices(self.variants, weights=self.traffic_split, k=1)[0]
@@ -30,7 +30,7 @@ class ABTest:
             raise ValueError(f"Unknown variant: {variant}")
         self.results[variant].append(bool(passed))
 
-    def summary(self) -> Dict[str, Any]:
+    def summary(self) -> dict[str, Any]:
         summaries = {}
         for variant, outcomes in self.results.items():
             passed = sum(outcomes)

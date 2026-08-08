@@ -22,12 +22,10 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import socket
 import subprocess
 import sys
 from pathlib import Path
-from typing import List, Optional
 
 try:
     import requests
@@ -57,7 +55,7 @@ def _mask_dict(d: dict) -> dict:
     return {k: ("****" if any(s in k.lower() for s in _SECRET_KEYS) else v) for k, v in d.items()}
 
 
-def _http_get(path: str, host: str, port: int) -> Optional["requests.Response"]:
+def _http_get(path: str, host: str, port: int) -> requests.Response | None:
     url = f"http://{host}:{port}{path}"
     if requests is None:
         print(f"requests not installed; cannot call {url}")
@@ -69,7 +67,7 @@ def _http_get(path: str, host: str, port: int) -> Optional["requests.Response"]:
         return None
 
 
-def _http_post(path: str, host: str, port: int, payload: dict) -> Optional["requests.Response"]:
+def _http_post(path: str, host: str, port: int, payload: dict) -> requests.Response | None:
     url = f"http://{host}:{port}{path}"
     if requests is None:
         print(f"requests not installed; cannot call {url}")
@@ -188,7 +186,7 @@ def cmd_config(args: argparse.Namespace) -> int:
     return 0
 
 
-def _find_log_file() -> Optional[Path]:
+def _find_log_file() -> Path | None:
     candidates = [
         APP_DIR / "logs" / "zqm-void.log",
         APP_DIR / "zqm-void.log",
@@ -230,7 +228,7 @@ def cmd_logs(args: argparse.Namespace) -> int:
 
 
 def cmd_test(args: argparse.Namespace) -> int:
-    paths: List[str] = args.paths or ["tests"]
+    paths: list[str] = args.paths or ["tests"]
     cmd = [sys.executable, "-m", "pytest", *paths]
     print(" ".join(cmd))
     return int(subprocess.call(cmd, cwd=str(APP_DIR)))
@@ -282,7 +280,7 @@ def cmd_self_improve(args: argparse.Namespace) -> int:
     return _request_post(args, "/api/self-improve/run", {})
 
 
-def main(argv: Optional[list[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="zqm-ai-master")
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8808)

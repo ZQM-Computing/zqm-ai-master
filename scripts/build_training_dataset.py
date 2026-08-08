@@ -13,20 +13,18 @@ import json
 import os
 import sqlite3
 import sys
-import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 # Ensure local package imports work when run as a script.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.core.config import settings
 
 
 DB_PATH = "app/flatspace_local.db"
 DEFAULT_OUTPUT = "data/training_data.jsonl"
 
 
-def _chunks_from_flatspace(tier: str = "bitgarden", limit: int = 10000) -> List[Dict[str, Any]]:
+def _chunks_from_flatspace(tier: str = "bitgarden", limit: int = 10000) -> list[dict[str, Any]]:
     """Extract (prompt, completion) pairs from Flatspace local DB."""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -35,7 +33,7 @@ def _chunks_from_flatspace(tier: str = "bitgarden", limit: int = 10000) -> List[
         (tier, limit),
     ).fetchall()
     conn.close()
-    out: List[Dict[str, Any]] = []
+    out: list[dict[str, Any]] = []
     for row in rows:
         try:
             val = json.loads(row["value"]) if row["value"] else {}
@@ -81,7 +79,7 @@ def _chunks_from_flatspace(tier: str = "bitgarden", limit: int = 10000) -> List[
     return out
 
 
-def _write_jsonl(records: List[Dict[str, Any]], path: str) -> int:
+def _write_jsonl(records: list[dict[str, Any]], path: str) -> int:
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     count = 0
     with open(path, "w", encoding="utf-8") as f:

@@ -7,13 +7,9 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
-import sys
-import time
-import urllib.request
 import urllib.error
-from typing import Any, Dict, List, Optional
-
+import urllib.request
+from typing import Any
 
 MESH_NODES = [
     {"id": "n1", "ip": "192.168.1.224", "port": 8808},
@@ -22,7 +18,7 @@ MESH_NODES = [
 ]
 
 
-def _request(url: str, payload: Optional[Dict[str, Any]] = None, timeout: int = 10) -> Dict[str, Any]:
+def _request(url: str, payload: dict[str, Any] | None = None, timeout: int = 10) -> dict[str, Any]:
     data = json.dumps(payload).encode() if payload is not None else None
     req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
     try:
@@ -35,18 +31,16 @@ def _request(url: str, payload: Optional[Dict[str, Any]] = None, timeout: int = 
         return {"_error": str(exc)}
 
 
-def discover_live_nodes() -> List[Dict[str, Any]]:
+def discover_live_nodes() -> list[dict[str, Any]]:
     live = []
     for node in MESH_NODES:
         resp = _request(f"http://{node['ip']}:{node['port']}/healthz", timeout=5)
-        if resp.get("status") == "ok" or (not resp.get("_http_status") and not resp.get("_error")):
-            live.append(node)
-        elif "_http_status" not in resp and "_error" not in resp:
+        if resp.get("status") == "ok" or (not resp.get("_http_status") and not resp.get("_error")) or "_http_status" not in resp and "_error" not in resp:
             live.append(node)
     return live
 
 
-def split_dataset(dataset_path: str, num_splits: int) -> List[str]:
+def split_dataset(dataset_path: str, num_splits: int) -> list[str]:
     """Split JSONL dataset into N parts for distributed training."""
     import random
     lines = []
@@ -69,7 +63,7 @@ def split_dataset(dataset_path: str, num_splits: int) -> List[str]:
     return out_paths
 
 
-def submit_training_job(node: Dict[str, Any], job: Dict[str, Any]) -> Dict[str, Any]:
+def submit_training_job(node: dict[str, Any], job: dict[str, Any]) -> dict[str, Any]:
     """Submit a training job to a mesh node."""
     url = f"http://{node['ip']}:{node['port']}/api/train/lora"
     return _request(url, payload=job, timeout=10)
@@ -81,7 +75,7 @@ def orchestrate(
     output_dir: str,
     epochs: int = 1,
     lora_rank: int = 4,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Orchestrate training across live mesh nodes."""
     live = discover_live_nodes()
     print(f"Live nodes: {[n['id'] for n in live]}")

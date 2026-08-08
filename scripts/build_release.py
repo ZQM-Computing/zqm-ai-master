@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import shutil
 import sys
-from configparser import ConfigParser
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent

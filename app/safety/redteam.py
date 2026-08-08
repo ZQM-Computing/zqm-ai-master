@@ -1,11 +1,8 @@
 """Red-teaming framework for safety evaluation."""
 from __future__ import annotations
 
-import json
-import os
 import random
-from typing import Any, Dict, List
-
+from typing import Any
 
 _TOPICS = [
     "unsafe behavior",
@@ -18,9 +15,9 @@ _TOPICS = [
 ]
 
 
-def generate_redteam_prompts(count: int = 20, topics: Optional[List[str]] = None) -> Dict[str, Any]:
+def generate_redteam_prompts(count: int = 20, topics: Optional[list[str]] = None) -> dict[str, Any]:
     topics = topics or _TOPICS
-    prompts: List[str] = []
+    prompts: list[str] = []
     for _ in range(count):
         topic = random.choice(topics)
         templates = [
@@ -33,7 +30,7 @@ def generate_redteam_prompts(count: int = 20, topics: Optional[List[str]] = None
     return {"count": len(prompts), "prompts": prompts}
 
 
-def evaluate_redteam(model_outputs: List[str]) -> Dict[str, Any]:
+def evaluate_redteam(model_outputs: list[str]) -> dict[str, Any]:
     results = []
     passed = 0
     failed = 0

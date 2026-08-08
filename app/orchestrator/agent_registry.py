@@ -10,14 +10,18 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from app.core.config import settings
 from app.core.logger import get_logger
 from app.models.agent import (
-    Agent, AgentCreate, AgentStatus, AgentSummary, AgentType, AgentCapability,
-    AgentPerformanceMetrics,
+    Agent,
+    AgentCapability,
+    AgentCreate,
+    AgentStatus,
+    AgentSummary,
+    AgentType,
 )
 
 log = get_logger("agent-registry")
@@ -25,7 +29,7 @@ log = get_logger("agent-registry")
 
 # ── Default agent pool definition ────────────────────────────────────────────
 
-DEFAULT_AGENTS: List[Dict[str, Any]] = [
+DEFAULT_AGENTS: list[dict[str, Any]] = [
     {
         "name": "ZQM-NLP-Prime",
         "agent_type": AgentType.NLP,
@@ -472,17 +476,17 @@ class AgentRegistry:
     """
 
     def __init__(self) -> None:
-        self._agents: Dict[str, Agent] = {}
+        self._agents: dict[str, Agent] = {}
         self._lock = asyncio.Lock()
         # pair -> co-task count for parallel multi-agent runs
-        self._co_task_pairs: Dict[tuple, int] = {}
+        self._co_task_pairs: dict[tuple, int] = {}
         self._family_keys: set[str] = set()
         log.info("AgentRegistry initialized")
 
     # ── Inference helpers ──────────────────────────────────────────────────────
 
     @staticmethod
-    def infer_family_key(name: Optional[str]) -> Optional[str]:
+    def infer_family_key(name: str | None) -> str | None:
 
         if not name:
             return None
@@ -564,13 +568,13 @@ class AgentRegistry:
 
     # ── Retrieval ─────────────────────────────────────────────────────────────
 
-    async def get(self, agent_id: str) -> Optional[Agent]:
+    async def get(self, agent_id: str) -> Agent | None:
         return self._agents.get(agent_id)
 
-    async def list_all(self) -> List[Agent]:
+    async def list_all(self) -> list[Agent]:
         return list(self._agents.values())
 
-    async def list_summaries(self) -> List[AgentSummary]:
+    async def list_summaries(self) -> list[AgentSummary]:
         return [
             AgentSummary(
                 agent_id=a.agent_id,
@@ -587,14 +591,14 @@ class AgentRegistry:
             for a in self._agents.values()
         ]
 
-    async def get_by_type(self, agent_type: AgentType) -> List[Agent]:
+    async def get_by_type(self, agent_type: AgentType) -> list[Agent]:
         return [a for a in self._agents.values() if a.agent_type == agent_type]
 
-    async def get_by_capability(self, capability: AgentCapability) -> List[Agent]:
+    async def get_by_capability(self, capability: AgentCapability) -> list[Agent]:
         return [a for a in self._agents.values() if capability in a.capabilities]
 
-    async def get_family_counts(self) -> Dict[str, int]:
-        counts: Dict[str, int] = {}
+    async def get_family_counts(self) -> dict[str, int]:
+        counts: dict[str, int] = {}
         for a in self._agents.values():
             key = a.family_key or AgentRegistry.infer_family_key(a.name) or "unknown"
             counts[key] = counts.get(key, 0) + 1
@@ -604,12 +608,12 @@ class AgentRegistry:
 
     async def select_best(
         self,
-        agent_type: Optional[AgentType] = None,
-        capabilities: Optional[List[AgentCapability]] = None,
+        agent_type: AgentType | None = None,
+        capabilities: list[AgentCapability] | None = None,
         count: int = 1,
-        exclude: Optional[List[str]] = None,
+        exclude: list[str] | None = None,
         load_aware: bool = True,
-    ) -> List[Agent]:
+    ) -> list[Agent]:
         """
         Select the best available agent(s).
 
@@ -667,11 +671,11 @@ class AgentRegistry:
         self,
         cognitive_level: str,
         input_method: str,
-        context: Optional[Dict[str, Any]] = None,
-        input_text: Optional[str] = None,
-        routed_level: Optional[str] = None,
-        routing_meta: Optional[Dict[str, Any]] = None,
-    ) -> List[Agent]:
+        context: dict[str, Any] | None = None,
+        input_text: str | None = None,
+        routed_level: str | None = None,
+        routing_meta: dict[str, Any] | None = None,
+    ) -> list[Agent]:
         """
         Intelligently select agents based on cognitive level and input method.
 
@@ -688,7 +692,7 @@ class AgentRegistry:
         appended so the agent can actually reach The Void's systems even on
         default chat/advanced traffic (not only via rare input methods).
         """
-        selections: List[Agent] = []
+        selections: list[Agent] = []
 
         if cognitive_level == "basic":
             nlp_agents = await self.select_best(agent_type=AgentType.NLP, count=1)
@@ -733,10 +737,10 @@ class AgentRegistry:
     async def _select_domain_agent(
         self,
         input_method: str,
-        context: Optional[Dict[str, Any]],
-    ) -> Optional[Agent]:
+        context: dict[str, Any] | None,
+    ) -> Agent | None:
         """Pick a domain specialist based on task context."""
-        domain_map: Dict[str, AgentType] = {
+        domain_map: dict[str, AgentType] = {
             "map_input": AgentType.GIS,
             "calculators": AgentType.HYDROLOGY,
             "wizards": AgentType.HYDROLOGY,
@@ -761,8 +765,8 @@ class AgentRegistry:
         return None
 
     async def _select_tool_agents_for_text(
-        self, input_text: Optional[str]
-    ) -> List[Agent]:
+        self, input_text: str | None
+    ) -> list[Agent]:
         """
         If the request text implies a tool (reach into The Void's systems),
         return the relevant tool-capable agent(s) so the task can actually
@@ -776,7 +780,7 @@ class AgentRegistry:
         if not input_text:
             return []
         t = input_text.lower()
-        picks: List[AgentType] = []
+        picks: list[AgentType] = []
         if any(k in t for k in ("model", "ollama")):
             picks.append(AgentType.API)
         if any(k in t for k in ("garden", "metrics", "node", "job", "compute")):
@@ -810,7 +814,7 @@ class AgentRegistry:
             agent.current_tasks += 1
             if agent.current_tasks >= agent.max_concurrent:
                 agent.status = AgentStatus.BUSY
-            agent.last_active = datetime.now(timezone.utc)
+            agent.last_active = datetime.now(UTC)
 
     async def mark_idle(self, agent_id: str, success: bool, latency_ms: int, tokens: int = 0) -> None:
         agent = self._agents.get(agent_id)
@@ -822,7 +826,7 @@ class AgentRegistry:
 
     # ── Co-task pair topology ───────────────────────────────────────────────────
 
-    async def record_co_task(self, agent_ids: List[str]) -> None:
+    async def record_co_task(self, agent_ids: list[str]) -> None:
         """
         Record that N agents ran together on one task. Emits pairwise
         counters so the mesh knows which agents actually collaborate,
@@ -837,7 +841,7 @@ class AgentRegistry:
                     key = (unique[i], unique[j])
                     self._co_task_pairs[key] = self._co_task_pairs.get(key, 0) + 1
 
-    def get_top_co_task_pairs(self, limit: int = 20) -> List[Dict[str, Any]]:
+    def get_top_co_task_pairs(self, limit: int = 20) -> list[dict[str, Any]]:
         pairs = sorted(self._co_task_pairs.items(), key=lambda kv: kv[1], reverse=True)
         return [
             {"agent_a": a, "agent_b": b, "co_task_count": count}
@@ -851,7 +855,7 @@ class AgentRegistry:
 
     # ── Stats ─────────────────────────────────────────────────────────────────
 
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         agents = list(self._agents.values())
         return {
             "total": len(agents),

@@ -9,13 +9,12 @@ Supports: Bearer tokens, API keys, service-to-service tokens.
 from __future__ import annotations
 
 import secrets
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from fastapi import Depends, HTTPException, Security, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, APIKeyHeader
+from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 
 from app.core.config import settings
 from app.core.logger import get_logger
@@ -36,6 +35,7 @@ api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 # service key is ever exposed.
 import os as _os
 
+
 def _load_service_key(env_var: str, fallback_name: str) -> str:
     """Load a service key from env; generate a stable fallback for dev only."""
     val = _os.environ.get(env_var, "")
@@ -43,14 +43,15 @@ def _load_service_key(env_var: str, fallback_name: str) -> str:
         return val
     # Dev-mode fallback: derive a HMAC of the secret with a fixed label so
     # different services still get different, non-overlapping keys.
-    import hmac, hashlib
+    import hashlib
+    import hmac
     return hmac.new(
         settings.secret_key.encode(),
         fallback_name.encode(),
         hashlib.sha256,
     ).hexdigest()
 
-INTERNAL_SERVICE_KEYS: Dict[str, str] = {
+INTERNAL_SERVICE_KEYS: dict[str, str] = {
     "ZQM-GARDEN":          _load_service_key("ZQM_GARDEN_SERVICE_KEY",          "zqm-garden"),
     "ZQM-FLATSPACE":          _load_service_key("ZQM_FLATSPACE_SERVICE_KEY",          "zqm-flatspace"),
     "ZQM-OBSERVABILITY": _load_service_key("ZQM_OBSERVABILITY_SERVICE_KEY", "zqm-observability"),
@@ -60,9 +61,9 @@ INTERNAL_SERVICE_KEYS: Dict[str, str] = {
 # ── JWT utilities ─────────────────────────────────────────────────────────────
 
 def create_access_token(
-    subject: str | Dict[str, Any],
-    expires_delta: Optional[timedelta] = None,
-    extra_claims: Optional[Dict[str, Any]] = None,
+    subject: str | dict[str, Any],
+    expires_delta: timedelta | None = None,
+    extra_claims: dict[str, Any] | None = None,
 ) -> str:
     """
     Create a signed JWT access token.
@@ -78,10 +79,10 @@ def create_access_token(
     if expires_delta is None:
         expires_delta = timedelta(minutes=settings.access_token_expire_minutes)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expire = now + expires_delta
 
-    payload: Dict[str, Any] = {
+    payload: dict[str, Any] = {
         "sub": str(subject) if not isinstance(subject, dict) else None,
         "iat": now,
         "exp": expire,
@@ -102,7 +103,7 @@ def create_access_token(
     return jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
 
 
-def decode_token(token: str) -> Dict[str, Any]:
+def decode_token(token: str) -> dict[str, Any]:
     """
     Decode and validate a JWT token.
 
@@ -155,9 +156,9 @@ def generate_api_key() -> str:
 # ── FastAPI dependencies ──────────────────────────────────────────────────────
 
 async def get_current_token_payload(
-    credentials: Optional[HTTPAuthorizationCredentials] = Security(bearer_scheme),
-    api_key: Optional[str] = Security(api_key_header),
-) -> Dict[str, Any]:
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer_scheme),
+    api_key: str | None = Security(api_key_header),
+) -> dict[str, Any]:
     """
     FastAPI dependency: extract & validate auth from Bearer token or API key.
 
@@ -203,8 +204,8 @@ async def get_current_token_payload(
 
 
 async def get_current_user(
-    payload: Dict[str, Any] = Depends(get_current_token_payload),
-) -> Dict[str, Any]:
+    payload: dict[str, Any] = Depends(get_current_token_payload),
+) -> dict[str, Any]:
     """Dependency: returns current authenticated user/service info."""
     if not payload.get("sub"):
         raise HTTPException(
@@ -215,8 +216,8 @@ async def get_current_user(
 
 
 async def require_admin(
-    payload: Dict[str, Any] = Depends(get_current_token_payload),
-) -> Dict[str, Any]:
+    payload: dict[str, Any] = Depends(get_current_token_payload),
+) -> dict[str, Any]:
     """Dependency: requires admin role in token."""
     roles = payload.get("roles", [])
     if "admin" not in roles:
@@ -230,9 +231,9 @@ async def require_admin(
 # ── Optional auth (returns None if not provided) ──────────────────────────────
 
 async def optional_auth(
-    credentials: Optional[HTTPAuthorizationCredentials] = Security(bearer_scheme),
-    api_key: Optional[str] = Security(api_key_header),
-) -> Optional[Dict[str, Any]]:
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer_scheme),
+    api_key: str | None = Security(api_key_header),
+) -> dict[str, Any] | None:
     """Dependency: returns token payload OR None — does not raise on missing auth."""
     try:
         return await get_current_token_payload(credentials, api_key)

@@ -2,7 +2,7 @@
 import asyncio
 import json
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 BASE = "http://127.0.0.1:8808"
 
@@ -79,7 +79,7 @@ async def main():
 
     # 6) Write proof artifact
     proof = {
-        "ts": datetime.now(timezone.utc).isoformat(),
+        "ts": datetime.now(UTC).isoformat(),
         "convene": cdata,
         "redis_keys": keys,
         "flatspace_sessions": len(results),

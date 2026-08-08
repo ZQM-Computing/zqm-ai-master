@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -76,7 +76,7 @@ class FlatSpaceService:
         return FLATSPACE_MODE == "local"
 
     # ── Embeddings (best-effort, for semantic store/search) ────────────
-    async def _embed_text(self, text: str) -> Optional[list]:
+    async def _embed_text(self, text: str) -> list | None:
         """Embed text for semantic search. Returns None on any failure."""
         # Prefer direct local Ollama embeddings to avoid mesh model availability issues.
         try:
@@ -117,7 +117,7 @@ class FlatSpaceService:
             import hashlib
             h = hashlib.sha256(text.encode("utf-8", errors="replace")).digest()
             # 384-dim float vector in [-1,1]
-            out: List[float] = []
+            out: list[float] = []
             for b in h:
                 out.append((b / 127.5) - 1.0)
             # Extend to 384 by re-hashing shifted slices
@@ -132,7 +132,7 @@ class FlatSpaceService:
             log.debug("FLATSPACE local fallback embed failed", error=str(exc))
             return None
 
-    async def _embed_for(self, key: str, value: Any) -> Optional[list]:
+    async def _embed_for(self, key: str, value: Any) -> list | None:
         """Build an embedding for a stored record (key + value)."""
         text = f"{key} {json.dumps(value, default=str)[:4000]}"
         return await self._embed_text(text)
@@ -145,9 +145,9 @@ class FlatSpaceService:
         key: str,
         value: Any,
         tier: str = "bitgarden",
-        ttl: Optional[int] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        ttl: int | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Store a value in the specified FLATSPACE memory tier.
 
@@ -205,7 +205,7 @@ class FlatSpaceService:
         self,
         key: str,
         tier: str = "bitgarden",
-    ) -> Optional[Any]:
+    ) -> Any | None:
         """
         Retrieve a value from the specified FLATSPACE memory tier.
 
@@ -240,7 +240,7 @@ class FlatSpaceService:
         self,
         keys: list[str],
         tier: str = "bitgarden",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Batch retrieve multiple keys from FLATSPACE."""
         endpoint = settings.flatspace_endpoint
         try:
@@ -280,7 +280,7 @@ class FlatSpaceService:
 
     async def list_keys(
         self, prefix: str, tier: str = "bitgarden", limit: int = 100
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Prefix-key listing (no embedding). Local-only: the remote FLATSPACE
         has no key-prefix endpoint, so this always uses the local store."""
         return self._local.list_keys(prefix, tier, limit)
@@ -290,7 +290,7 @@ class FlatSpaceService:
         query: str,
         tier: str = "bitgarden",
         limit: int = 10,
-    ) -> list[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Search FLATSPACE memory by query string (semantic or key-based).
         Returns matched records.
@@ -344,7 +344,7 @@ class FlatSpaceService:
 
     # ── Tier info ─────────────────────────────────────────────────────────────
 
-    async def get_tier_stats(self) -> Dict[str, Any]:
+    async def get_tier_stats(self) -> dict[str, Any]:
         """Fetch usage statistics for all FLATSPACE tiers.
 
         Prefers the remote tier store; on any failure (the remote is almost

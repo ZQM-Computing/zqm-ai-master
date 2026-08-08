@@ -14,7 +14,7 @@ Exposes the endpoints GardenService expects:
 from __future__ import annotations
 
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
@@ -27,17 +27,17 @@ log = get_logger("router.garden")
 
 # ── In-memory job store ──────────────────────────────────────────────────────
 # In production this would be backed by flatspace or a real queue.
-_jobs: Dict[str, Dict[str, Any]] = {}
+_jobs: dict[str, dict[str, Any]] = {}
 
 
 class CoordinateRequest(BaseModel):
     task_id: str
     task_type: str = "generic"
-    payload: Dict[str, Any] = Field(default_factory=dict)
+    payload: dict[str, Any] = Field(default_factory=dict)
     strategy: str = "round_robin"
-    preferred_node: Optional[str] = None
+    preferred_node: str | None = None
     gpu_required: bool = False
-    zqm_ai_id: Optional[str] = None
+    zqm_ai_id: str | None = None
 
 
 class CoordinateResponse(BaseModel):
@@ -58,7 +58,7 @@ class NodeInfo(BaseModel):
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
-def _garden_nodes() -> List[NodeInfo]:
+def _garden_nodes() -> list[NodeInfo]:
     nodes = []
     for i, node_ip in enumerate(
         [
@@ -99,7 +99,7 @@ def _pick_node(req: CoordinateRequest) -> str:
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
 @router.get("/health")
-async def garden_health() -> Dict[str, Any]:
+async def garden_health() -> dict[str, Any]:
     return {
         "service": "garden",
         "zqm_ai_id": settings.zqm_ai_id,
@@ -137,7 +137,7 @@ async def coordinate(req: CoordinateRequest, request: Request) -> CoordinateResp
 
 
 @router.get("/jobs/{job_id}")
-async def get_job_status(job_id: str) -> Dict[str, Any]:
+async def get_job_status(job_id: str) -> dict[str, Any]:
     job = _jobs.get(job_id)
     if not job:
         return {"job_id": job_id, "status": "unknown", "error": "not found"}
@@ -153,9 +153,9 @@ async def get_job_status(job_id: str) -> Dict[str, Any]:
 
 
 @router.get("/metrics")
-async def garden_metrics(request: Request) -> Dict[str, Any]:
+async def garden_metrics(request: Request) -> dict[str, Any]:
     orch = getattr(request.app.state, "orchestrator", None)
-    agents: List[Dict[str, Any]] = []
+    agents: list[dict[str, Any]] = []
     if orch and hasattr(orch, "registry"):
         try:
             registry = orch.registry
@@ -204,7 +204,7 @@ async def garden_metrics(request: Request) -> Dict[str, Any]:
 
 
 @router.get("/nodes")
-async def garden_nodes() -> List[NodeInfo]:
+async def garden_nodes() -> list[NodeInfo]:
     return _garden_nodes()
 
 

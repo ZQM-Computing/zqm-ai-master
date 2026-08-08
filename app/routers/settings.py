@@ -7,7 +7,7 @@ Runtime settings and configuration management.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
@@ -23,17 +23,17 @@ log = get_logger("router.settings")
 
 class SettingsUpdate(BaseModel):
     """Partial settings update payload (runtime-modifiable fields only)."""
-    default_cognitive_level: Optional[str] = None
-    default_ai_provider: Optional[str] = None
-    max_concurrent_tasks: Optional[int] = None
-    task_timeout_seconds: Optional[int] = None
-    observability_enabled: Optional[bool] = None
-    log_level: Optional[str] = None
-    void_cache_strategy: Optional[str] = None
+    default_cognitive_level: str | None = None
+    default_ai_provider: str | None = None
+    max_concurrent_tasks: int | None = None
+    task_timeout_seconds: int | None = None
+    observability_enabled: bool | None = None
+    log_level: str | None = None
+    void_cache_strategy: str | None = None
 
 
 # Runtime-mutable settings (subset of all settings)
-_runtime_overrides: Dict[str, Any] = {}
+_runtime_overrides: dict[str, Any] = {}
 
 
 @router.get(
@@ -42,7 +42,7 @@ _runtime_overrides: Dict[str, Any] = {}
     summary="Get current settings",
 )
 async def get_settings_view(
-    auth: Dict[str, Any] = Depends(require_admin),
+    auth: dict[str, Any] = Depends(require_admin),
 ) -> ZQM_AIResponse:
     """
     Return current The Void runtime configuration.
@@ -88,7 +88,7 @@ async def get_settings_view(
 async def update_settings(
     update: SettingsUpdate,
     request: Request,
-    auth: Dict[str, Any] = Depends(require_admin),
+    auth: dict[str, Any] = Depends(require_admin),
 ) -> ZQM_AIResponse:
     """
     Update runtime-modifiable settings without restart.
@@ -97,7 +97,7 @@ async def update_settings(
     (e.g., log_level, cache_strategy).
     """
     orchestrator = request.app.state.orchestrator
-    changes: Dict[str, Any] = {}
+    changes: dict[str, Any] = {}
 
     if update.default_cognitive_level is not None:
         _runtime_overrides["default_cognitive_level"] = update.default_cognitive_level

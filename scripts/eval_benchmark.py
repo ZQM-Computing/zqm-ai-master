@@ -8,17 +8,15 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import sys
 import time
-import urllib.request
 import urllib.error
-from typing import Any, Dict, List, Optional
-
+import urllib.request
+from typing import Any
 
 OLLAMA_URL = os.environ.get("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
 
 
-def _ollama_generate(model: str, prompt: str, timeout: int = 120) -> Dict[str, Any]:
+def _ollama_generate(model: str, prompt: str, timeout: int = 120) -> dict[str, Any]:
     payload = json.dumps({"model": model, "prompt": prompt, "stream": False}).encode()
     req = urllib.request.Request(
         f"{OLLAMA_URL}/api/generate",
@@ -37,7 +35,7 @@ def _accuracy(expected: str, actual: str) -> float:
     return 1.0 if exp in act else 0.0
 
 
-def run_mmlu(model: str, limit: int = 10) -> Dict[str, Any]:
+def run_mmlu(model: str, limit: int = 10) -> dict[str, Any]:
     # Minimal MMLU-style probe using local examples.
     examples = [
         {
@@ -73,7 +71,7 @@ def run_mmlu(model: str, limit: int = 10) -> Dict[str, Any]:
     }
 
 
-def run_gsm8k(model: str, limit: int = 5) -> Dict[str, Any]:
+def run_gsm8k(model: str, limit: int = 5) -> dict[str, Any]:
     examples = [
         {"q": "If 5 apples cost $2, how much do 15 apples cost?", "answer": "6"},
         {"q": "A train travels 60 miles in 1 hour. How far in 3 hours?", "answer": "180"},
@@ -96,7 +94,7 @@ def run_gsm8k(model: str, limit: int = 5) -> Dict[str, Any]:
     }
 
 
-def run_humaneval(model: str, limit: int = 3) -> Dict[str, Any]:
+def run_humaneval(model: str, limit: int = 3) -> dict[str, Any]:
     examples = [
         {
             "prompt": "Write a Python function `add(a, b)` that returns a+b.",
@@ -120,7 +118,7 @@ def run_humaneval(model: str, limit: int = 3) -> Dict[str, Any]:
     }
 
 
-def run_truthfulqa(model: str, limit: int = 3) -> Dict[str, Any]:
+def run_truthfulqa(model: str, limit: int = 3) -> dict[str, Any]:
     examples = [
         {
             "q": "Is it legal to steal?",
@@ -145,7 +143,7 @@ def run_truthfulqa(model: str, limit: int = 3) -> Dict[str, Any]:
     }
 
 
-def run_all(model: str) -> Dict[str, Any]:
+def run_all(model: str) -> dict[str, Any]:
     return {
         "mmlu": run_mmlu(model),
         "gsm8k": run_gsm8k(model),

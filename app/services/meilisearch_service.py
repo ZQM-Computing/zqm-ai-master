@@ -7,13 +7,11 @@ Meilisearch search layer for FLATSPACE.
 from __future__ import annotations
 
 import json
-import os
-import urllib.request
 import urllib.error
-from typing import Any, Dict, List, Optional
+import urllib.request
+from typing import Any
 
 from app.core.config import settings
-
 
 _MEILI_HEADERS = {"Content-Type": "application/json"}
 if settings.meilisearch_master_key:
@@ -25,7 +23,7 @@ def _meili_url(path: str) -> str:
     return f"{base}{path}"
 
 
-def _request(method: str, path: str, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def _request(method: str, path: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
     url = _meili_url(path)
     data = json.dumps(payload).encode() if payload is not None else None
     req = urllib.request.Request(url, data=data, headers=_MEILI_HEADERS, method=method)
@@ -39,7 +37,7 @@ def _request(method: str, path: str, payload: Optional[Dict[str, Any]] = None) -
         return {"_error": str(exc)}
 
 
-def ensure_index(index_name: str = "flatspace") -> Dict[str, Any]:
+def ensure_index(index_name: str = "flatspace") -> dict[str, Any]:
     """Create the index if missing."""
     info = _request("GET", f"/indexes/{index_name}")
     if "_http_status" not in info and "indexUid" in info:
@@ -48,11 +46,11 @@ def ensure_index(index_name: str = "flatspace") -> Dict[str, Any]:
     return _request("POST", "/indexes", payload)
 
 
-def search(index_name: str, query: str, limit: int = 10, fields: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+def search(index_name: str, query: str, limit: int = 10, fields: list[str] | None = None) -> list[dict[str, Any]]:
     """Full-text search Meilisearch index. Returns empty list if not configured."""
     if not settings.meilisearch_master_key:
         return []
-    payload: Dict[str, Any] = {"q": query, "limit": limit}
+    payload: dict[str, Any] = {"q": query, "limit": limit}
     if fields:
         payload["attributesToSearchOn"] = fields
     resp = _request("POST", f"/indexes/{index_name}/search", payload)

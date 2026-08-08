@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 import socket
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
@@ -21,7 +21,7 @@ from app.core.config import settings
 router = APIRouter(prefix="/api/internal", tags=["Internal"])
 
 
-def _redacted_summary() -> Dict[str, Any]:
+def _redacted_summary() -> dict[str, Any]:
     """Summarize live configuration lengths without revealing values."""
     def ln(name: str) -> int:
         v = os.getenv(name, "")
@@ -49,14 +49,12 @@ async def internal_selfcheck(request: Request) -> JSONResponse:
       - route table method breakdown
       - config redaction summary (lengths only)
     """
-    import socket
-    from datetime import datetime
 
     fastapi_app = request.app
     host = socket.gethostname()
     pid = os.getpid()
     start = datetime.utcnow().isoformat() + "Z"
-    methods: Dict[str, int] = {}
+    methods: dict[str, int] = {}
     for rt in fastapi_app.routes:
         ms = getattr(rt, "methods", None)
         if ms:

@@ -23,11 +23,10 @@ e.g.  TUNE: API-Conductor weight +2
 
 from __future__ import annotations
 
-import asyncio
 import os
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.core.config import settings
 from app.core.logger import get_logger
@@ -59,7 +58,7 @@ _GEO_KEYWORDS = [
 ]
 
 
-def _panel_for_topic(topic: Optional[str]) -> Optional[List[str]]:
+def _panel_for_topic(topic: str | None) -> list[str] | None:
     if not topic:
         return None
     t = topic.lower()
@@ -69,7 +68,7 @@ def _panel_for_topic(topic: Optional[str]) -> Optional[List[str]]:
     return None  # general topic -> default generalist panel
 
 
-def _panel_defs(panel: Optional[List[str]]) -> List[Dict[str, Any]]:
+def _panel_defs(panel: list[str] | None) -> list[dict[str, Any]]:
     names = panel or DEFAULT_PANEL
     by_name = {a["name"]: a for a in DEFAULT_AGENTS}
     chosen = [by_name[n] for n in names if n in by_name]
@@ -84,10 +83,10 @@ def _panel_defs(panel: Optional[List[str]]) -> List[Dict[str, Any]]:
 
 async def run_roundtable(
     topic: str,
-    panel: Optional[List[str]] = None,
+    panel: list[str] | None = None,
     rounds: int = 2,
-    model: Optional[str] = None,
-) -> Dict[str, Any]:
+    model: str | None = None,
+) -> dict[str, Any]:
     """
     Run a multi-agent roundtable IN-VOID. Each agent hears the prior
     transcript (real multi-agent dialogue). Returns
@@ -97,7 +96,7 @@ async def run_roundtable(
     if not agents:
         return {"error": "no valid agents in panel"}
     model = model or settings.ollama_default_model
-    transcript_lines: List[str] = [f"TOPIC: {topic}"]
+    transcript_lines: list[str] = [f"TOPIC: {topic}"]
 
     # Panelists route through the mesh Ollama router (failover + degraded
     # substitution), not the bare localhost base_url — so a crashed Ollama
@@ -162,7 +161,7 @@ async def _agent_speak(model, agent, transcript_lines, instr) -> str:
         return f"[ERR {exc}]"
 
 
-async def integrate_findings(orchestrator: Any) -> Dict[str, Any]:
+async def integrate_findings(orchestrator: Any) -> dict[str, Any]:
     """
     Read self-improvement findings from FLATSPACE, extract TUNE: directives,
     and apply them to the LIVE agent-registry load weights. Runtime + reversible
@@ -176,7 +175,7 @@ async def integrate_findings(orchestrator: Any) -> Dict[str, Any]:
     except Exception as exc:
         return {"applied": False, "reason": f"flatspace search failed: {exc}"}
 
-    applied: List[Dict[str, Any]] = []
+    applied: list[dict[str, Any]] = []
     for rec in findings:
         text = str(rec.get("value", ""))
         if isinstance(rec.get("value"), dict):
@@ -202,7 +201,7 @@ async def integrate_findings(orchestrator: Any) -> Dict[str, Any]:
     return {"applied": len(applied), "tweaks": applied, "live": SELF_APPLY_ON}
 
 
-def _apply_weight(orchestrator: Any, name: str, delta: int) -> Dict[str, Any]:
+def _apply_weight(orchestrator: Any, name: str, delta: int) -> dict[str, Any]:
     """Adjust a live agent's ATRM load weight. No-op (propose) unless SELF_APPLY_ON."""
     reg = getattr(orchestrator, "registry", None)
     if reg is None:

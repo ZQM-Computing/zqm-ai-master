@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -29,10 +29,10 @@ class Subscription:
     customer_id: str
     plan: str
     status: SubscriptionStatus = SubscriptionStatus.TRIAL
-    trial_ends_at: Optional[datetime] = None
-    current_period_end: Optional[datetime] = None
+    trial_ends_at: datetime | None = None
+    current_period_end: datetime | None = None
     seats: int = 1
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -41,8 +41,8 @@ class UsageEvent:
     event_type: str
     quantity: int = 1
     unit: str = "event"
-    occurred_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    properties: Dict[str, Any] = field(default_factory=dict)
+    occurred_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    properties: dict[str, Any] = field(default_factory=dict)
 
 
 class BillingGateway:
@@ -55,12 +55,12 @@ class BillingGateway:
     """
 
     def __init__(self) -> None:
-        self._subscriptions: Dict[str, Subscription] = {}
-        self._events: List[UsageEvent] = []
+        self._subscriptions: dict[str, Subscription] = {}
+        self._events: list[UsageEvent] = []
         self._adapter = os.getenv("BILLING_ADAPTER", "stub").lower()
 
     def create_trial(self, customer_id: str, plan: str = "starter", days: int = 14) -> Subscription:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         sub = Subscription(
             customer_id=customer_id,
             plan=plan,
@@ -74,7 +74,7 @@ class BillingGateway:
         self._subscriptions[customer_id] = sub
         return sub
 
-    def get_subscription(self, customer_id: str) -> Optional[Subscription]:
+    def get_subscription(self, customer_id: str) -> Subscription | None:
         return self._subscriptions.get(customer_id)
 
     def record_usage(self, event: UsageEvent) -> None:
@@ -83,7 +83,7 @@ class BillingGateway:
             return
         raise NotImplementedError(f"Billing adapter '{self._adapter}' is not implemented in this build.")
 
-    def summary(self) -> Dict[str, Any]:
+    def summary(self) -> dict[str, Any]:
         return {
             "adapter": self._adapter,
             "subscriptions": len(self._subscriptions),

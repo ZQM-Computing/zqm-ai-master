@@ -1,4 +1,7 @@
-import paramiko, os
+import os
+
+import paramiko
+
 pw = os.environ.get("QUANTUM_LLM_SSH_PW", "EllaRose89!")
 host = "192.168.1.31"
 c = paramiko.SSHClient()

@@ -8,10 +8,10 @@ do not hardcode node IPs elsewhere in the codebase.
 from __future__ import annotations
 
 import socket
-from typing import Dict, Iterable, Tuple
+from collections.abc import Iterable
 
 # Canonical node IPs as of 2026-08-08.
-NODE_IPS: Dict[str, str] = {
+NODE_IPS: dict[str, str] = {
     "N1": "192.168.1.224",
     "N2": "192.168.1.196",
     "N3": "192.168.1.78",
@@ -24,7 +24,7 @@ def node_ip(node_id: str, fallback: str | None = None) -> str:
     return NODE_IPS.get(node_id.upper(), fallback or "")
 
 
-def all_node_ips() -> Iterable[Tuple[str, str]]:
+def all_node_ips() -> Iterable[tuple[str, str]]:
     return sorted(NODE_IPS.items())
 
 

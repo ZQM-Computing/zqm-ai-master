@@ -11,8 +11,8 @@ import re
 import sqlite3
 import sys
 import time
-import urllib.request
 import urllib.error
+import urllib.request
 
 # Ensure local package imports work when run as a script.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

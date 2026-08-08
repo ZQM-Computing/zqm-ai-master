@@ -1,11 +1,9 @@
 """Safety checks for model outputs."""
 from __future__ import annotations
 
-import json
-import os
 import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
@@ -14,7 +12,7 @@ class SafetyResult:
     passed: bool
     severity: str = "low"
     message: str = ""
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
 
 
 _TOXIC_PATTERNS = [
@@ -75,7 +73,7 @@ def _check_refusal(text: str) -> SafetyResult:
     )
 
 
-def run_safety_checks(text: str, checks: Optional[List[str]] = None) -> Dict[str, Any]:
+def run_safety_checks(text: str, checks: list[str] | None = None) -> dict[str, Any]:
     available = {
         "toxicity": _check_toxicity,
         "pii": _check_pii,
@@ -83,7 +81,7 @@ def run_safety_checks(text: str, checks: Optional[List[str]] = None) -> Dict[str
     }
     if checks is None:
         checks = list(available.keys())
-    results: List[SafetyResult] = []
+    results: list[SafetyResult] = []
     for name in checks:
         if name in available:
             results.append(available[name](text))

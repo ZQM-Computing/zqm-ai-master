@@ -7,12 +7,12 @@ Real-time dashboard statistics and agent management.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
 from app.core.logger import get_logger
-from app.core.security import require_admin, get_current_token_payload
+from app.core.security import get_current_token_payload, require_admin
 from app.models.agent import AgentCreate, AgentUpdate
 from app.models.response import ZQM_AIResponse
 
@@ -32,7 +32,7 @@ async def agents_alias(
     request: Request,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ):
     return await list_agents(request, auth=auth, page=page, page_size=page_size)
 log = get_logger("router.dashboard")
@@ -45,7 +45,7 @@ log = get_logger("router.dashboard")
 )
 async def get_dashboard(
     request: Request,
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> ZQM_AIResponse:
     """
     Returns comprehensive real-time statistics for the The Void dashboard:
@@ -76,7 +76,7 @@ async def list_agents(
     request: Request,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> ZQM_AIResponse:
     """Return paginated agents in the registry with their current status and metrics."""
     from app.models.response import PaginatedResponse
@@ -106,7 +106,7 @@ async def list_agents(
 async def get_agent(
     agent_id: str,
     request: Request,
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> ZQM_AIResponse:
     """Return full details for a specific agent including performance metrics."""
     orchestrator = request.app.state.orchestrator
@@ -128,7 +128,7 @@ async def get_agent(
 async def register_agent(
     agent_data: AgentCreate,
     request: Request,
-    auth: Dict[str, Any] = Depends(require_admin),
+    auth: dict[str, Any] = Depends(require_admin),
 ) -> ZQM_AIResponse:
     """Register a new autonomous agent in the The Void pool."""
     orchestrator = request.app.state.orchestrator
@@ -149,7 +149,7 @@ async def update_agent(
     agent_id: str,
     update: AgentUpdate,
     request: Request,
-    auth: Dict[str, Any] = Depends(require_admin),
+    auth: dict[str, Any] = Depends(require_admin),
 ) -> ZQM_AIResponse:
     """Update an agent's configuration (status, system prompt, limits, etc.)."""
     orchestrator = request.app.state.orchestrator
@@ -187,7 +187,7 @@ async def update_agent(
 async def deregister_agent(
     agent_id: str,
     request: Request,
-    auth: Dict[str, Any] = Depends(require_admin),
+    auth: dict[str, Any] = Depends(require_admin),
 ) -> ZQM_AIResponse:
     """Remove an agent from the registry."""
     orchestrator = request.app.state.orchestrator
@@ -209,7 +209,7 @@ async def deregister_agent(
 )
 async def get_cache_stats(
     request: Request,
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> ZQM_AIResponse:
     """Return VoidCache performance statistics."""
     orchestrator = request.app.state.orchestrator
@@ -224,7 +224,7 @@ async def get_cache_stats(
 )
 async def flush_cache(
     request: Request,
-    auth: Dict[str, Any] = Depends(require_admin),
+    auth: dict[str, Any] = Depends(require_admin),
 ) -> ZQM_AIResponse:
     """Flush all entries from VoidCache (volatile memory only)."""
     orchestrator = request.app.state.orchestrator
@@ -241,7 +241,7 @@ async def flush_cache(
 )
 async def get_garden_status(
     request: Request,
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> ZQM_AIResponse:
     """Return status and metrics for all ZQM Garden nodes."""
     orchestrator = request.app.state.orchestrator

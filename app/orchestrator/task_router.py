@@ -8,7 +8,7 @@ and ZQM Garden compute strategy based on input method and context.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from app.core.config import settings
 from app.core.logger import get_logger
@@ -20,7 +20,7 @@ log = get_logger("task-router")
 # ── Routing Tables ────────────────────────────────────────────────────────────
 
 # Default cognitive level per input method
-INPUT_METHOD_COGNITIVE_MAP: Dict[str, CognitiveLevel] = {
+INPUT_METHOD_COGNITIVE_MAP: dict[str, CognitiveLevel] = {
     InputMethod.CHAT: CognitiveLevel.AUTONOMOUS,
     InputMethod.MAP_INPUT: CognitiveLevel.NEURAL,
     InputMethod.FILE_UPLOAD: CognitiveLevel.AUTONOMOUS,
@@ -36,7 +36,7 @@ INPUT_METHOD_COGNITIVE_MAP: Dict[str, CognitiveLevel] = {
 }
 
 # ZQM Garden priority per input method (from zqm-garden-compute-rules.json)
-INPUT_METHOD_PRIORITY_MAP: Dict[str, TaskPriority] = {
+INPUT_METHOD_PRIORITY_MAP: dict[str, TaskPriority] = {
     InputMethod.CHAT: TaskPriority.CRITICAL,
     InputMethod.MAP_INPUT: TaskPriority.HIGH,
     InputMethod.FILE_UPLOAD: TaskPriority.NORMAL,
@@ -52,7 +52,7 @@ INPUT_METHOD_PRIORITY_MAP: Dict[str, TaskPriority] = {
 }
 
 # Garden distribution strategy per input method
-INPUT_METHOD_GARDEN_STRATEGY: Dict[str, str] = {
+INPUT_METHOD_GARDEN_STRATEGY: dict[str, str] = {
     InputMethod.MAP_INPUT: "parallel",
     InputMethod.FILE_UPLOAD: "queue_based",
     InputMethod.CALCULATORS: "gpu_priority",
@@ -111,7 +111,7 @@ class TaskRouter:
         4. Settings default
         """
         input_lower = request.input.lower()
-        keyword_triggers: List[str] = []
+        keyword_triggers: list[str] = []
 
         # Check for autonomous keywords — always elevate
         autonomous_hit = next((kw for kw in AUTONOMOUS_KEYWORDS if kw in input_lower), None)
@@ -151,7 +151,7 @@ class TaskRouter:
         # Use input method priority
         return INPUT_METHOD_PRIORITY_MAP.get(request.input_method, TaskPriority.NORMAL)
 
-    def analyze_requirements(self, request: TaskRequest) -> Dict[str, Any]:
+    def analyze_requirements(self, request: TaskRequest) -> dict[str, Any]:
         """
         Return a full analysis of task requirements for routing and
         Garden resource allocation (used by ZQM_AIOrchestrator).
@@ -185,7 +185,7 @@ class TaskRouter:
         else:
             return "very_high"
 
-    def route_with_audit(self, request: TaskRequest) -> Tuple[TaskRequest, Dict[str, Any]]:
+    def route_with_audit(self, request: TaskRequest) -> tuple[TaskRequest, dict[str, Any]]:
         """Route task and return routing metadata for observability/audit."""
         original_level = request.cognitive_level
         routed_level = self._determine_cognitive_level(request)

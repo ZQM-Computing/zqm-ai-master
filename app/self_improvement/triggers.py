@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 class AutomaticFineTuningTrigger:
@@ -16,7 +16,7 @@ class AutomaticFineTuningTrigger:
         self.threshold = threshold
         self.min_avg_rating = min_avg_rating
 
-    def should_trigger(self) -> Dict[str, Any]:
+    def should_trigger(self) -> dict[str, Any]:
         if not os.path.exists(self.feedback_path):
             return {"trigger": False, "reason": "no_feedback_file"}
         ratings = []

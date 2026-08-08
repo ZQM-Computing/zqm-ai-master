@@ -20,8 +20,8 @@ import json
 import logging
 import os
 import time
-from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, Request, status
 from pydantic import BaseModel, Field
@@ -36,12 +36,12 @@ router = APIRouter(prefix="/api/webhook", tags=["webhooks"])
 
 
 class MoltbookWebhook(BaseModel):
-    event: Optional[str] = None
-    resource: Optional[Dict[str, Any]] = None
-    payload: Optional[Dict[str, Any]] = None
+    event: str | None = None
+    resource: dict[str, Any] | None = None
+    payload: dict[str, Any] | None = None
 
 
-def _verify_moltbook_signature(body: bytes, signature: Optional[str], secret: str) -> bool:
+def _verify_moltbook_signature(body: bytes, signature: str | None, secret: str) -> bool:
     if not secret or not signature:
         return False
     expected = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
@@ -51,8 +51,8 @@ def _verify_moltbook_signature(body: bytes, signature: Optional[str], secret: st
 @router.post("/moltbook", summary="Moltbook webhook receiver")
 async def moltbook_webhook(
     request: Request,
-    x_moltbook_signature: Optional[str] = Header(None, alias="X-Moltbook-Signature"),
-    x_moltbook_event: Optional[str] = Header(None, alias="X-Moltbook-Event"),
+    x_moltbook_signature: str | None = Header(None, alias="X-Moltbook-Signature"),
+    x_moltbook_event: str | None = Header(None, alias="X-Moltbook-Event"),
 ):
     body = await request.body()
     secret = os.getenv("MOLTBOOK_WEBHOOK_SECRET", "")
@@ -94,12 +94,12 @@ class DeploymentWebhook(BaseModel):
     app_name: str = Field(..., description="Application or service name")
     environment: str = Field(default="production", description="Deployment environment")
     status: str = Field(..., description="Deployment status: success | failed | in_progress")
-    commit_sha: Optional[str] = Field(default=None)
-    branch: Optional[str] = Field(default=None)
-    repository: Optional[str] = Field(default=None)
-    deployed_by: Optional[str] = Field(default=None)
-    message: Optional[str] = Field(default=None)
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    commit_sha: str | None = Field(default=None)
+    branch: str | None = Field(default=None)
+    repository: str | None = Field(default=None)
+    deployed_by: str | None = Field(default=None)
+    message: str | None = Field(default=None)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class HealthResponse(BaseModel):
@@ -145,7 +145,7 @@ def _verify_azure_devops_signature(body: bytes, signature: str, secret: str) -> 
 async def _ingest_webhook_event(
     source: str,
     event_type: str,
-    data: Dict[str, Any],
+    data: dict[str, Any],
     severity: str = "info",
 ) -> dict:
     """
@@ -156,7 +156,6 @@ async def _ingest_webhook_event(
     Fail-soft: any single sink failure is logged, never raises.
     """
     from app.core.event_bus import bus
-    from app.core.config import settings
 
     payload = {
         "source": source,
@@ -215,9 +214,9 @@ def set_orchestrator(o) -> None:
 @router.post("/github", summary="GitHub webhook receiver")
 async def github_webhook(
     request: Request,
-    x_hub_signature_256: Optional[str] = Header(None, alias="X-Hub-Signature-256"),
+    x_hub_signature_256: str | None = Header(None, alias="X-Hub-Signature-256"),
     x_github_event: str = Header(..., alias="X-GitHub-Event"),
-    x_github_delivery: Optional[str] = Header(None, alias="X-GitHub-Delivery"),
+    x_github_delivery: str | None = Header(None, alias="X-GitHub-Delivery"),
 ):
     """
     Receive GitHub webhook events.
@@ -568,9 +567,9 @@ async def deploy_webhook(deploy: DeploymentWebhook):
 @router.post("/dealwork", summary="Dealwork.ai marketplace webhook")
 async def dealwork_webhook(
     request: Request,
-    x_agent_id: Optional[str] = Header(None, alias="X-Agent-ID"),
-    x_timestamp: Optional[str] = Header(None, alias="X-Timestamp"),
-    x_signature: Optional[str] = Header(None, alias="X-Signature"),
+    x_agent_id: str | None = Header(None, alias="X-Agent-ID"),
+    x_timestamp: str | None = Header(None, alias="X-Timestamp"),
+    x_signature: str | None = Header(None, alias="X-Signature"),
 ):
     """
     Receive dealwork.ai marketplace events.
@@ -644,7 +643,7 @@ async def webhook_info():
     """Return webhook receiver status and configured endpoints."""
     return {
         "status": "active",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "webhook_types": [
             {
                 "path": "/api/webhook/github",

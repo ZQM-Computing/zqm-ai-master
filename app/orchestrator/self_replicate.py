@@ -29,9 +29,9 @@ from __future__ import annotations
 import json
 import os
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.core.logger import get_logger
 
@@ -51,10 +51,10 @@ _REPLICATE_RE = re.compile(r"REPLICATE:\s*\n(.*?)(?=\n(?:EXPAND_AGENT:|EXPAND_TO
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
-def _audit(orchestrator: Any, record: Dict[str, Any]) -> None:
+def _audit(orchestrator: Any, record: dict[str, Any]) -> None:
     record = {**record, "ts": _now(), "self_apply": SELF_APPLY_ON}
     try:
         with _LEDGER.open("a", encoding="utf-8") as f:
@@ -106,7 +106,7 @@ def _ssh_put(node: str, local: str, remote: str) -> bool:
         rdir = os.path.dirname(remote)
         try:
             sftp.stat(rdir)
-        except IOError:
+        except OSError:
             c.exec_command(f"cmd /c mkdir {rdir}")
         sftp.put(local, remote)
         sftp.close()
@@ -130,7 +130,7 @@ def _validate_target(node: str) -> tuple:
     return True, "ok"
 
 
-async def replicate_to(orchestrator: Any, node: str, confirm: bool = False) -> Dict[str, Any]:
+async def replicate_to(orchestrator: Any, node: str, confirm: bool = False) -> dict[str, Any]:
     """Validate + (if gated+confirmed) deploy a logical Void replica to `node`."""
     ok, why = _validate_target(node)
     proposal = {"target_node": node, "target_ip": KNOWN_NODES.get(node, node), "path": REPLICA_PATH}
@@ -248,7 +248,7 @@ async def replicate_to(orchestrator: Any, node: str, confirm: bool = False) -> D
     return {"applied": applied, "reason": None if applied else err2, "service": svc_name, **proposal}
 
 
-async def process_findings(orchestrator: Any, findings_text: str, confirm: bool = False) -> Dict[str, Any]:
+async def process_findings(orchestrator: Any, findings_text: str, confirm: bool = False) -> dict[str, Any]:
     """Scan findings for REPLICATE: directives and process them."""
     applied, proposed = [], []
     for m in _REPLICATE_RE.finditer(findings_text):
@@ -263,7 +263,7 @@ async def process_findings(orchestrator: Any, findings_text: str, confirm: bool 
             "proposals": proposed, "actions": applied}
 
 
-def review_ledger(limit: int = 50) -> List[Dict[str, Any]]:
+def review_ledger(limit: int = 50) -> list[dict[str, Any]]:
     if not _LEDGER.exists():
         return []
     return [json.loads(l) for l in _LEDGER.read_text(encoding="utf-8").splitlines() if l.strip()][-limit:]

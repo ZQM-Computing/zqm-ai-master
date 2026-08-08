@@ -17,21 +17,24 @@ from __future__ import annotations
 
 import asyncio
 import time
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import UTC, datetime
+from typing import Any
 
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
-
-from app.services.cost_tracker import estimate_cost
 
 from app.core.config import settings
 from app.core.logger import get_logger
 from app.memory.void_cache import get_void_cache
 from app.models.agent import Agent
 from app.models.task import (
-    AgentExecution, CognitiveLevel, CognitiveTrace, TaskRequest, TaskResult,
+    AgentExecution,
+    CognitiveLevel,
+    CognitiveTrace,
+    TaskRequest,
+    TaskResult,
 )
+from app.services.cost_tracker import estimate_cost
 
 log = get_logger("cognitive-processor")
 
@@ -53,9 +56,9 @@ class CognitiveProcessor:
     async def process(
         self,
         request: TaskRequest,
-        agents: List[Agent],
+        agents: list[Agent],
         registry,     # AgentRegistry — avoid circular import with type hint
-    ) -> Tuple[TaskResult, CognitiveTrace]:
+    ) -> tuple[TaskResult, CognitiveTrace]:
         """
         Execute a task at the specified cognitive level.
 
@@ -101,7 +104,7 @@ class CognitiveProcessor:
     async def _process_basic(
         self,
         request: TaskRequest,
-        agents: List[Agent],
+        agents: list[Agent],
         trace: CognitiveTrace,
         registry,
     ) -> TaskResult:
@@ -139,7 +142,7 @@ class CognitiveProcessor:
     async def _process_advanced(
         self,
         request: TaskRequest,
-        agents: List[Agent],
+        agents: list[Agent],
         trace: CognitiveTrace,
         registry,
     ) -> TaskResult:
@@ -154,8 +157,8 @@ class CognitiveProcessor:
         tasks = [self._run_agent(a, request, registry) for a in agents]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        executions: List[AgentExecution] = []
-        outputs: List[str] = []
+        executions: list[AgentExecution] = []
+        outputs: list[str] = []
 
         for i, res in enumerate(results):
             if isinstance(res, Exception):
@@ -234,7 +237,7 @@ class CognitiveProcessor:
     async def _process_neural(
         self,
         request: TaskRequest,
-        agents: List[Agent],
+        agents: list[Agent],
         trace: CognitiveTrace,
         registry,
     ) -> TaskResult:
@@ -259,7 +262,7 @@ class CognitiveProcessor:
 
         # 2. Retrieve session context
         context_key = f"session:{request.session_id}" if request.session_id else None
-        session_context: Optional[str] = None
+        session_context: str | None = None
         if context_key:
             session_context = await self._cache.get(context_key)
             if session_context:
@@ -302,7 +305,7 @@ class CognitiveProcessor:
     async def _process_autonomous(
         self,
         request: TaskRequest,
-        agents: List[Agent],
+        agents: list[Agent],
         trace: CognitiveTrace,
         registry,
     ) -> TaskResult:
@@ -362,7 +365,7 @@ class CognitiveProcessor:
 
     # ── Agent execution ───────────────────────────────────────────────────────
 
-    def _extract_interaction_texts(self, output: str, tool_trace: List[Dict[str, Any]]) -> List[str]:
+    def _extract_interaction_texts(self, output: str, tool_trace: list[dict[str, Any]]) -> list[str]:
         if tool_trace:
             return [entry.get("result") or "" for entry in tool_trace] + [output or ""]
         # For plain model outputs, derive pseudo-steps from text structure.
@@ -371,7 +374,7 @@ class CognitiveProcessor:
             chunks = [c.strip() for c in (output or "").split(". ") if c.strip()]
         return chunks or [output or ""]
 
-    def _populate_reconstruction_metrics(self, execution: AgentExecution, output: str, tool_trace: List[Dict[str, Any]]) -> None:
+    def _populate_reconstruction_metrics(self, execution: AgentExecution, output: str, tool_trace: list[dict[str, Any]]) -> None:
         try:
             interaction_texts = self._extract_interaction_texts(output, tool_trace)
             execution.step_hashes = [hex(hash(t) & 0xFFFFFFFFFFFFFFFF)[2:] for t in interaction_texts if t]
@@ -389,7 +392,7 @@ class CognitiveProcessor:
         agent: Agent,
         request: TaskRequest,
         registry,
-    ) -> Tuple[AgentExecution, str]:
+    ) -> tuple[AgentExecution, str]:
         """
         Execute a single agent on a task.
         Calls the configured AI provider (Ollama/OpenAI/Anthropic).
@@ -400,10 +403,12 @@ class CognitiveProcessor:
         not just talk. Otherwise it falls back to a plain model call.
         """
         from app.orchestrator.agent_runtime import (
-            run_agent_with_tools, tools_for_agent, _system_tools_for_text,
+            _system_tools_for_text,
+            run_agent_with_tools,
+            tools_for_agent,
         )
 
-        started_at = datetime.now(timezone.utc)
+        started_at = datetime.now(UTC)
         t0 = time.monotonic()
 
         execution = AgentExecution(
@@ -449,7 +454,7 @@ class CognitiveProcessor:
                 self._populate_reconstruction_metrics(execution, output or "", [])
                 execution.tokens_used = token_usage.get("total_tokens") or len((output or "").split()) * 2
 
-            execution.completed_at = datetime.now(timezone.utc)
+            execution.completed_at = datetime.now(UTC)
             execution.duration_ms = int((time.monotonic() - t0) * 1000)
             execution.output = output
 
@@ -464,7 +469,7 @@ class CognitiveProcessor:
 
         except Exception as exc:
             latency_ms = int((time.monotonic() - t0) * 1000)
-            execution.completed_at = datetime.now(timezone.utc)
+            execution.completed_at = datetime.now(UTC)
             execution.duration_ms = latency_ms
             execution.error = str(exc)
 
@@ -475,10 +480,10 @@ class CognitiveProcessor:
     async def _generate(
         self,
         agent: Agent,
-        messages: List[Dict[str, str]],
-        params: Optional[Dict[str, Any]] = None,
-        model: Optional[str] = None,
-    ) -> Tuple[str, Dict[str, int]]:
+        messages: list[dict[str, str]],
+        params: dict[str, Any] | None = None,
+        model: str | None = None,
+    ) -> tuple[str, dict[str, int]]:
         """Call the model provider. Returns (generated_text, token_usage)."""
         token_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
         provider = agent.provider
@@ -507,7 +512,7 @@ class CognitiveProcessor:
             return text, token_usage
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=10))
-    async def _call_ai_provider(self, agent: Agent, request: TaskRequest) -> Tuple[str, Dict[str, int]]:
+    async def _call_ai_provider(self, agent: Agent, request: TaskRequest) -> tuple[str, dict[str, int]]:
         """
         Call the configured AI provider for this agent.
         Supports: Ollama (local), OpenAI, Anthropic.
@@ -536,7 +541,7 @@ class CognitiveProcessor:
 
         messages.append({"role": "user", "content": request.input})
 
-        params: Dict[str, Any] = {
+        params: dict[str, Any] = {
             "max_tokens": request.max_tokens or 4096,
             "temperature": request.temperature or 0.7,
         }
@@ -558,9 +563,9 @@ class CognitiveProcessor:
         self,
         client: httpx.AsyncClient,
         model: str,
-        messages: List[Dict],
-        params: Dict,
-        token_usage: Dict[str, int],
+        messages: list[dict],
+        params: dict,
+        token_usage: dict[str, int],
     ) -> str:
         # Federation: route across the ZQM-MESH Ollama pool (N1/N2/N3/N4),
         # selecting the node that actually has `model`, with failover.
@@ -620,9 +625,9 @@ class CognitiveProcessor:
         self,
         client: httpx.AsyncClient,
         model: str,
-        messages: List[Dict],
-        params: Dict,
-        token_usage: Dict[str, int],
+        messages: list[dict],
+        params: dict,
+        token_usage: dict[str, int],
     ) -> str:
         response = await client.post(
             "https://api.openai.com/v1/chat/completions",
@@ -649,9 +654,9 @@ class CognitiveProcessor:
     async def _call_local_deterministic(
         self,
         agent: Agent,
-        messages: List[Dict[str, str]],
-        params: Dict[str, Any],
-        token_usage: Dict[str, int],
+        messages: list[dict[str, str]],
+        params: dict[str, Any],
+        token_usage: dict[str, int],
     ) -> str:
         """Deterministic fallback when no LLM backend is available."""
         system_prompt = agent.system_prompt or agent.name or "ZQM Agent"
@@ -686,9 +691,9 @@ class CognitiveProcessor:
         self,
         client: httpx.AsyncClient,
         model: str,
-        messages: List[Dict],
-        params: Dict,
-        token_usage: Dict[str, int],
+        messages: list[dict],
+        params: dict,
+        token_usage: dict[str, int],
     ) -> str:
         # Anthropic uses separate system / messages format
         system_msg = ""
@@ -699,7 +704,7 @@ class CognitiveProcessor:
             else:
                 user_messages.append(msg)
 
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "model": model,
             "max_tokens": params.get("max_tokens", 4096),
             "messages": user_messages,
@@ -731,7 +736,7 @@ class CognitiveProcessor:
 
     async def _synthesize(
         self,
-        outputs: List[str],
+        outputs: list[str],
         request: TaskRequest,
         trace: CognitiveTrace,
     ) -> str:

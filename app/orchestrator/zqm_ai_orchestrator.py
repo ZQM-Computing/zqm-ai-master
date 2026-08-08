@@ -19,40 +19,40 @@ import json
 import os
 import time
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from app.core.config import settings
 from app.core.logger import get_logger
 from app.memory.void_cache import get_void_cache
 from app.models.response import DashboardStats, HealthStatus
 from app.models.task import (
-    CognitiveLevel, Task, TaskRequest, TaskResult, TaskStatus,
+    Task,
+    TaskRequest,
+    TaskResult,
+    TaskStatus,
 )
+from app.orchestrator import self_apply, system_integration, void_council
 from app.orchestrator.agent_registry import AgentRegistry, AgentType
 from app.orchestrator.cognitive_processor import CognitiveProcessor
 from app.orchestrator.task_router import TaskRouter
-from app.services.garden_service import GardenService
-from app.services.flatspace_service import FlatSpaceService
-from app.services.synology_service import SynologyService
-from app.services.mesh_node_ops import MeshNodeOperations
-from app.orchestrator import self_apply
-from app.orchestrator import system_integration
-from app.orchestrator import void_council
-from app.services.observability_service import ObservabilityService
 from app.services.falsification_protocol import FalsificationProtocol
+from app.services.flatspace_service import FlatSpaceService
+from app.services.garden_service import GardenService
+from app.services.mesh_node_ops import MeshNodeOperations
+from app.services.observability_service import ObservabilityService
 
 log = get_logger("zqm_ai-orchestrator")
 
 
-def _task_app_state(task: Optional["Task"], cognitive_trace: Any) -> Dict[str, Any]:
+def _task_app_state(task: Task | None, cognitive_trace: Any) -> dict[str, Any]:
     """Build app_state dict for falsification protocol from task + trace."""
     if task is None:
         task = type("Task", (), {"task_id": "unknown", "status": "unknown", "cognitive_level": "unknown"})()
-    wm: List[str] = []
-    kv_cache: List[float] = []
-    error_curve: List[float] = []
-    tool_output: Dict[str, Any] = {}
+    wm: list[str] = []
+    kv_cache: list[float] = []
+    error_curve: list[float] = []
+    tool_output: dict[str, Any] = {}
     seed = 42
     constraints = ["max_length=100", "no_code_switch", "preserve_tense"]
 
@@ -130,16 +130,16 @@ class ZQM_AIOrchestrator:
         self.observability._registry = self.registry
 
         # Runtime state
-        self._active_tasks: Dict[str, Task] = {}
-        self._task_history: Dict[str, Task] = {}
+        self._active_tasks: dict[str, Task] = {}
+        self._task_history: dict[str, Task] = {}
         self._background_tasks: set = set()
-        self._started_at: Optional[datetime] = None
+        self._started_at: datetime | None = None
         self._tasks_completed: int = 0
         self._tasks_failed: int = 0
         self._total_tokens: int = 0
         self._lock = asyncio.Lock()
-        self._self_improve_task: Optional[asyncio.Task] = None
-        self._council_task: Optional[asyncio.Task] = None
+        self._self_improve_task: asyncio.Task | None = None
+        self._council_task: asyncio.Task | None = None
         self._void_council = void_council.VoidCouncil(
             registry=self.registry,
             settings=settings,
@@ -156,7 +156,7 @@ class ZQM_AIOrchestrator:
     async def startup(self) -> None:
         """Initialize all subsystems."""
         log.info("ZQM_AIOrchestrator starting up...")
-        self._started_at = datetime.now(timezone.utc)
+        self._started_at = datetime.now(UTC)
 
         # Start agent pool
         await self.registry.startup()
@@ -212,7 +212,7 @@ class ZQM_AIOrchestrator:
                     self._wait_for_active_tasks(),
                     timeout=30.0,
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 log.warning("Shutdown timeout — forcing close")
 
         await self.registry.shutdown()
@@ -246,7 +246,7 @@ class ZQM_AIOrchestrator:
             priority=routed.priority,
             input_method=routed.input_method,
             status=TaskStatus.PROCESSING,
-            started_at=datetime.now(timezone.utc),
+            started_at=datetime.now(UTC),
             session_id=routed.session_id,
             user_id=routed.user_id,
             tags=routed.tags,
@@ -298,7 +298,7 @@ class ZQM_AIOrchestrator:
                     asyncio.shield(self.processor.process(routed, agents, self.registry)),
                     timeout=exec_timeout,
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # Mark all selected agents as failed/timeout so they aren't
                 # reused while hung work is still pending underneath.
                 for a in agents:
@@ -326,7 +326,7 @@ class ZQM_AIOrchestrator:
             # 5. Finalize task record
             duration_ms = int((time.monotonic() - t0) * 1000)
             task.status = TaskStatus.COMPLETED
-            task.completed_at = datetime.now(timezone.utc)
+            task.completed_at = datetime.now(UTC)
             task.duration_ms = duration_ms
             task.result = result
             task.cognitive_trace = cognitive_trace
@@ -343,7 +343,7 @@ class ZQM_AIOrchestrator:
 
             # 5b. Surface agent tool/integration actions in the response
             #     (so callers can see which systems the agents reached).
-            agent_actions: List[Dict[str, Any]] = []
+            agent_actions: list[dict[str, Any]] = []
             for exec_rec in cognitive_trace.executions:
                 for action in getattr(exec_rec, "tool_trace", []) or []:
                     agent_actions.append({
@@ -373,7 +373,7 @@ class ZQM_AIOrchestrator:
 
             return result
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             task.status = TaskStatus.TIMEOUT
             task.error = f"Task timed out after {routed.timeout or settings.task_timeout_seconds}s"
             async with self._lock:
@@ -399,7 +399,7 @@ class ZQM_AIOrchestrator:
 
     # ── Task retrieval / durable persistence ───────────────────────────────────
 
-    async def _persist_task(self, task: "Task") -> None:
+    async def _persist_task(self, task: Task) -> None:
         """Durably store a terminal task record in FLATSPACE (local SQLite
         fallback survives a process restart). Fail-soft."""
         try:
@@ -412,7 +412,7 @@ class ZQM_AIOrchestrator:
         except Exception as exc:
             log.debug("task persist skipped", task_id=task.task_id, error=str(exc))
 
-    async def get_task(self, task_id: str) -> Optional["Task"]:
+    async def get_task(self, task_id: str) -> Task | None:
         task = self._active_tasks.get(task_id) or self._task_history.get(task_id)
         if task is not None:
             return task
@@ -426,18 +426,18 @@ class ZQM_AIOrchestrator:
             log.debug("task retrieve from FLATSPACE failed", task_id=task_id, error=str(exc))
         return None
 
-    async def get_active_tasks(self) -> List[Task]:
+    async def get_active_tasks(self) -> list[Task]:
         return list(self._active_tasks.values())
 
-    async def get_history(self, limit: int = 100) -> List[Task]:
+    async def get_history(self, limit: int = 100) -> list[Task]:
         tasks = list(self._task_history.values())
         return sorted(tasks, key=lambda t: t.created_at, reverse=True)[:limit]
 
-    async def get_durable_history(self, limit: int = 100) -> List[Task]:
+    async def get_durable_history(self, limit: int = 100) -> list[Task]:
         """History that survives a process restart: reads the durable
         `task:*` records persisted to FLATSPACE (local SQLite fallback).
         Merges with in-memory history, deduped by task_id. Fail-soft."""
-        merged: Dict[str, Task] = {t.task_id: t for t in self._task_history.values()}
+        merged: dict[str, Task] = {t.task_id: t for t in self._task_history.values()}
         try:
             from app.models.task import Task as _Task
             # Prefix-key listing (no embedding) — history must not depend on
@@ -479,7 +479,7 @@ class ZQM_AIOrchestrator:
         agent_stats = self.registry.stats()
         cache_stats = self.cache.stats()
         uptime = (
-            (datetime.now(timezone.utc) - self._started_at).total_seconds()
+            (datetime.now(UTC) - self._started_at).total_seconds()
             if self._started_at
             else 0.0
         )
@@ -494,7 +494,7 @@ class ZQM_AIOrchestrator:
                 ),
                 timeout=6.0,
             )
-        except (asyncio.TimeoutError, Exception):
+        except (TimeoutError, Exception):
             garden_ok, flatspace_ok, obs_ok = False, False, False
 
         database_ok = flatspace_ok
@@ -533,7 +533,6 @@ class ZQM_AIOrchestrator:
         except Exception as exc:
             with open("C:/Void/ZQM-AI-Master/debug_redis_status.txt", "a", encoding="utf-8") as f:
                 f.write(f"fresh redis exception: {exc}\n")
-            pass
 
         external_services = {
             "garden": "healthy" if garden_ok else "unreachable",
@@ -565,7 +564,7 @@ class ZQM_AIOrchestrator:
         agent_stats = self.registry.stats()
         cache_stats = self.cache.stats()
         uptime = (
-            (datetime.now(timezone.utc) - self._started_at).total_seconds()
+            (datetime.now(UTC) - self._started_at).total_seconds()
             if self._started_at
             else 0.0
         )
@@ -574,7 +573,7 @@ class ZQM_AIOrchestrator:
             garden_nodes = await asyncio.wait_for(
                 self.garden.get_online_nodes(), timeout=6.0
             )
-        except (asyncio.TimeoutError, Exception):
+        except (TimeoutError, Exception):
             garden_nodes = []
 
         total = self._tasks_completed + self._tasks_failed
@@ -599,7 +598,7 @@ class ZQM_AIOrchestrator:
             ],
         )
 
-    async def get_info(self) -> Dict[str, Any]:
+    async def get_info(self) -> dict[str, Any]:
         """Return system identity and configuration info."""
         return {
             "zqm_ai_id": self.ZQM_AI_ID,
@@ -656,7 +655,7 @@ class ZQM_AIOrchestrator:
         except Exception as exc:
             log.warning("FLATSPACE store failed during learning", error=str(exc))
 
-    async def generate_mcp(self, task_id: str) -> Dict[str, Any]:
+    async def generate_mcp(self, task_id: str) -> dict[str, Any]:
         """
         Generate a Machine-Checkable Proof (MCP) for a completed task.
         Returns a signed audit record suitable for WaxCell immutable storage.
@@ -669,7 +668,7 @@ class ZQM_AIOrchestrator:
             "mcp_id": f"mcp-{uuid.uuid4().hex[:12]}",
             "task_id": task_id,
             "zqm_ai_id": self.ZQM_AI_ID,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "status": task.status,
             "cognitive_level": task.cognitive_level,
             "agents_used": task.cognitive_trace.agents_used if task.cognitive_trace else [],
@@ -691,7 +690,7 @@ class ZQM_AIOrchestrator:
 
     # ── Constant Self-Improvement ─────────────────────────────────────────────
 
-    def _persist_self_improvement_local(self, record: Dict[str, Any]) -> None:
+    def _persist_self_improvement_local(self, record: dict[str, Any]) -> None:
         """
         Fallback persistence for self-improvement findings when FLATSPACE is
         unreachable. Appends one JSON line to self_improvement_log.jsonl
@@ -703,7 +702,7 @@ class ZQM_AIOrchestrator:
             log_path = base / "self_improvement_log.jsonl"
             with log_path.open("a", encoding="utf-8") as fh:
                 fh.write(json.dumps({
-                    "ts": datetime.now(timezone.utc).isoformat(),
+                    "ts": datetime.now(UTC).isoformat(),
                     **record,
                 }, default=str) + "\n")
             log.info("Self-improvement finding persisted locally", path=str(log_path))
@@ -727,7 +726,7 @@ class ZQM_AIOrchestrator:
             AgentType.GARDEN, AgentType.LEARNING, AgentType.HYDROLOGY,
         ]
         idx = 0
-        last_findings_summary: List[str] = []
+        last_findings_summary: list[str] = []
         while True:
             try:
                 await asyncio.sleep(interval)
@@ -740,7 +739,7 @@ class ZQM_AIOrchestrator:
                 log.warning("Self-improvement cycle failed (skipping)", error=str(exc))
                 await asyncio.sleep(30)
 
-    async def _self_critique(self, specialist: AgentType, last_findings_summary: List[str]) -> None:
+    async def _self_critique(self, specialist: AgentType, last_findings_summary: list[str]) -> None:
         """
         One self-improvement cycle: convene Reasoning + a rotating specialist +
         Synthesis to critique The Void and propose ONE concrete, code-level
@@ -816,7 +815,7 @@ class ZQM_AIOrchestrator:
                 return
                 try:
                     result = await self.flatspace.store(
-                        key=f"self_improvement:{datetime.now(timezone.utc).isoformat()}",
+                        key=f"self_improvement:{datetime.now(UTC).isoformat()}",
                         value={
                             "cycle_specialist": specialist.value,
                             "panel": [a.name for a in panel],

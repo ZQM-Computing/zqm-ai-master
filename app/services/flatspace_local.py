@@ -21,14 +21,14 @@ import json
 import os
 import sqlite3
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from app.core.config import settings
 from app.core.logger import get_logger
+
 log = get_logger("flatspace-local")
 
 
-def _safe_json(text: Optional[str]) -> Optional[List[float]]:
+def _safe_json(text: str | None) -> list[float] | None:
     """Parse a stored embedding JSON blob back into a vector."""
     if not text:
         return None
@@ -39,7 +39,7 @@ def _safe_json(text: Optional[str]) -> Optional[List[float]]:
         return None
 
 
-def _cosine(a: Optional[List[float]], b: Optional[List[float]]) -> Optional[float]:
+def _cosine(a: list[float] | None, b: list[float] | None) -> float | None:
     """Cosine similarity; None if either vector is missing/incompatible."""
     if not a or not b or len(a) != len(b):
         return None
@@ -71,7 +71,7 @@ class LocalFlatSpaceStore:
         get_tier_stats() -> Dict[str, Any]
     """
 
-    def __init__(self, db_path: Optional[str] = None) -> None:
+    def __init__(self, db_path: str | None = None) -> None:
         self._db = db_path or _db_path()
         self._conn = sqlite3.connect(self._db, check_same_thread=False)
         self._conn.execute(
@@ -104,10 +104,10 @@ class LocalFlatSpaceStore:
         key: str,
         value: Any,
         tier: str = "bitgarden",
-        ttl: Optional[int] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-        embedding: Optional[List[float]] = None,
-    ) -> Dict[str, Any]:
+        ttl: int | None = None,
+        metadata: dict[str, Any] | None = None,
+        embedding: list[float] | None = None,
+    ) -> dict[str, Any]:
         try:
             self._conn.execute(
                 """
@@ -138,7 +138,7 @@ class LocalFlatSpaceStore:
             return {"success": False, "error": str(exc), "key": key, "local": True}
 
     # ── Read ───────────────────────────────────────────────────────────
-    def retrieve(self, key: str, tier: str = "bitgarden") -> Optional[Any]:
+    def retrieve(self, key: str, tier: str = "bitgarden") -> Any | None:
         try:
             cur = self._conn.execute(
                 "SELECT value FROM flatspace WHERE key=? AND tier=?", (key, tier)
@@ -152,9 +152,9 @@ class LocalFlatSpaceStore:
             return None
 
     def retrieve_multi(
-        self, keys: List[str], tier: str = "bitgarden"
-    ) -> Dict[str, Any]:
-        out: Dict[str, Any] = {}
+        self, keys: list[str], tier: str = "bitgarden"
+    ) -> dict[str, Any]:
+        out: dict[str, Any] = {}
         try:
             placeholders = ",".join("?" for _ in keys) or "?"
             cur = self._conn.execute(
@@ -184,8 +184,8 @@ class LocalFlatSpaceStore:
     # ── Search ────────────────────────────────────────────────────────
     def search(
         self, query: str, tier: str = "bitgarden", limit: int = 10,
-        query_embedding: Optional[List[float]] = None,
-    ) -> List[Dict[str, Any]]:
+        query_embedding: list[float] | None = None,
+    ) -> list[dict[str, Any]]:
         try:
             cur = self._conn.execute(
                 "SELECT key, tier, value, metadata, created, embedding "
@@ -244,7 +244,7 @@ class LocalFlatSpaceStore:
     # ── Key listing (prefix scan, no embedding) ─────────────────────
     def list_keys(
         self, prefix: str, tier: str = "bitgarden", limit: int = 100
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List records whose key starts with `prefix` (exact prefix scan,
         no embedding / no substring value match). Used for history/replay
         without paying the Ollama embedding cost."""
@@ -269,7 +269,7 @@ class LocalFlatSpaceStore:
         except Exception as exc:
             log.warning("LocalFlatSpaceStore list_keys failed", prefix=prefix, error=str(exc))
             return []
-    def get_tier_stats(self) -> Dict[str, Any]:
+    def get_tier_stats(self) -> dict[str, Any]:
         try:
             cur = self._conn.execute(
                 "SELECT tier, COUNT(*) FROM flatspace GROUP BY tier"

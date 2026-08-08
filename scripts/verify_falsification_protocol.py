@@ -1,7 +1,10 @@
 """
 Verify falsification protocol integration in The Void.
 """
-import sys, os, json
+import json
+import os
+import sys
+
 sys.path.insert(0, r'C:\Void\ZQM-AI-Master')
 os.chdir(r'C:\Void\ZQM-AI-Master')
 
@@ -11,6 +14,7 @@ class _FakeLogger:
     def debug(self, *a, **kw): pass
 
 import app.services.falsification_protocol as fp
+
 fp.get_logger = lambda name: _FakeLogger()
 
 protocol = fp.FalsificationProtocol(app_state={

@@ -8,17 +8,12 @@ Provides:
 """
 from __future__ import annotations
 
-import json
-import os
-import sys
-from typing import Dict, List, Optional
-
 
 def deepspeed_zero3_config(
     model_params_b: float,
     batch_size: int = 4,
     lr: float = 2e-4,
-) -> Dict[str, any]:
+) -> dict[str, any]:
     """Generate DeepSpeed ZeRO-3 config."""
     return {
         "train_batch_size": batch_size,
@@ -42,7 +37,7 @@ def deepspeed_zero3_config(
 def fsdp_config(
     model_params_b: float,
     world_size: int = 2,
-) -> Dict[str, any]:
+) -> dict[str, any]:
     """Generate FSDP config."""
     return {
         "fsdp": {
@@ -62,7 +57,7 @@ def estimate_training_time(
     dataset_size: int,
     world_size: int = 1,
     gpu_type: str = "a100",
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """Estimate training time in hours."""
     throughput = {
         "a100": 50,  # it/s for 7B

@@ -1,4 +1,8 @@
-import urllib.request, json, time, statistics, sys
+import json
+import statistics
+import time
+import urllib.request
+
 BACKENDS = [
     ("N4", "http://192.168.1.228:11434"),
     ("N3", "http://192.168.1.78:11434"),

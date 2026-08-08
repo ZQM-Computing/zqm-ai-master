@@ -12,8 +12,8 @@ import os
 import sqlite3
 import sys
 import time
-import urllib.request
 import urllib.error
+import urllib.request
 import uuid
 
 # Ensure local package imports work when run as a script.

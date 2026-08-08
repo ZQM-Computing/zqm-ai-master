@@ -9,12 +9,8 @@ Provides:
 """
 from __future__ import annotations
 
-import os
-import sys
-from typing import Dict, Optional
 
-
-def bitsandbytes_config(load_in_4bit: bool = True) -> Dict[str, any]:
+def bitsandbytes_config(load_in_4bit: bool = True) -> dict[str, any]:
     """Generate BitsAndBytes quantization config."""
     return {
         "load_in_4bit": load_in_4bit,
@@ -24,7 +20,7 @@ def bitsandbytes_config(load_in_4bit: bool = True) -> Dict[str, any]:
     }
 
 
-def awq_config(quant_bits: int = 4) -> Dict[str, any]:
+def awq_config(quant_bits: int = 4) -> dict[str, any]:
     return {"quant_bits": quant_bits, "zero_point": True}
 
 
@@ -35,7 +31,7 @@ def estimate_quantized_size(model_params_b: float, bits: int = 4) -> float:
     return model_params_b * factor
 
 
-def inference_optimization_config() -> Dict[str, any]:
+def inference_optimization_config() -> dict[str, any]:
     return {
         "use_kv_cache": True,
         "max_batch_size": 8,

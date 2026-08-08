@@ -5,13 +5,10 @@ Implements defenses for all 8 challenges, including dynamic-world acceptance.
 from __future__ import annotations
 
 import hashlib
-import hmac
 import json
-import os
-import random
 import time
-from dataclasses import dataclass, field, asdict
-from typing import Any, Dict, List, Optional, Set
+from dataclasses import dataclass, field
+from typing import Any
 
 from app.core.logger import get_logger
 
@@ -35,12 +32,12 @@ def norm_hash(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def project_symbolic(values: List[float], levels: int = 16) -> bytes:
+def project_symbolic(values: list[float], levels: int = 16) -> bytes:
     symbols = [int(v * levels) % levels for v in values]
     return bytes(symbols)
 
 
-def shannon_entropy(bits: List[int]) -> float:
+def shannon_entropy(bits: list[int]) -> float:
     if not bits:
         return 0.0
     counts = __import__("collections").Counter(bits)
@@ -48,7 +45,7 @@ def shannon_entropy(bits: List[int]) -> float:
     return -sum((c / n) * __import__("math").log2(c / n) for c in counts.values())
 
 
-def strip_volatile(value: Any, volatile_keys: Set[str], _seen: Optional[Set[int]] = None) -> Any:
+def strip_volatile(value: Any, volatile_keys: set[str], _seen: set[int] | None = None) -> Any:
     if _seen is None:
         _seen = set()
     value_id = id(value)
@@ -63,7 +60,7 @@ def strip_volatile(value: Any, volatile_keys: Set[str], _seen: Optional[Set[int]
     return value
 
 
-def manifest_hash(manifest: Dict[str, Any]) -> str:
+def manifest_hash(manifest: dict[str, Any]) -> str:
     canonical = json.dumps(manifest, sort_keys=True, default=str)
     return norm_hash(canonical.encode("utf-8", errors="replace"))
 
@@ -74,8 +71,8 @@ def manifest_hash(manifest: Dict[str, Any]) -> str:
 @dataclass
 class BoundaryHash:
     envelope_hash: str
-    working_memory_hash: Optional[str]
-    manifest_hash: Optional[str]
+    working_memory_hash: str | None
+    manifest_hash: str | None
     timestamp: float = field(default_factory=time.time)
 
 
@@ -84,7 +81,7 @@ class DriftResult:
     caught: bool
     severity: str  # none | low | medium | high | critical
     semantic_drift: float
-    evidence: Dict[str, Any] = field(default_factory=dict)
+    evidence: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -104,13 +101,13 @@ class FalsificationProtocol:
     Each method maps to one of the 8 challenges.
     """
 
-    def __init__(self, app_state: Optional[Dict[str, Any]] = None):
+    def __init__(self, app_state: dict[str, Any] | None = None):
         self.app_state = app_state or {}
-        self.manifest_baseline: Optional[str] = None
-        self.boundary_history: List[BoundaryHash] = []
-        self.volatile_keys: Set[str] = {"timestamp", "requestId", "random", "session_id", "nonce"}
-        self.world_change_history: List[Dict[str, Any]] = []
-        self.world_change_tolerance: Dict[str, Any] = {
+        self.manifest_baseline: str | None = None
+        self.boundary_history: list[BoundaryHash] = []
+        self.volatile_keys: set[str] = {"timestamp", "requestId", "random", "session_id", "nonce"}
+        self.world_change_history: list[dict[str, Any]] = []
+        self.world_change_tolerance: dict[str, Any] = {
             "max_added_keys": 10,
             "max_removed_keys": 0,
             "max_staleness_s": 600.0,
@@ -118,7 +115,7 @@ class FalsificationProtocol:
             "allowed_change_types": {"added", "value_change"},
             "auto_reconcile": True,
         }
-        self._last_world_baseline: Dict[str, Any] = {}
+        self._last_world_baseline: dict[str, Any] = {}
         self._init_manifest()
 
     def _now(self) -> str:
@@ -137,7 +134,7 @@ class FalsificationProtocol:
 
     # ── Challenge 1: hardware float drift ──────────────────────────────────
 
-    def state_hash_with_projection(self, tensor: List[float]) -> Dict[str, Any]:
+    def state_hash_with_projection(self, tensor: list[float]) -> dict[str, Any]:
         """
         Hash tensor state with symbolic projection to avoid
         hardware-dependent float drift false positives.
@@ -153,7 +150,7 @@ class FalsificationProtocol:
 
     # ── Challenge 2: KV-cache eviction ─────────────────────────────────────
 
-    def boundary_hash(self, kv_cache: List[float], cumulative_error: float) -> str:
+    def boundary_hash(self, kv_cache: list[float], cumulative_error: float) -> str:
         """
         Hash KV-cache state at inference boundaries to detect
         non-linear error compounding from eviction.
@@ -166,8 +163,8 @@ class FalsificationProtocol:
         return norm_hash(json.dumps(state, sort_keys=True).encode())
 
     def detect_eviction_spike(
-        self, error_curve: List[float], window: int = 5, threshold: float = 3.0
-    ) -> Dict[str, Any]:
+        self, error_curve: list[float], window: int = 5, threshold: float = 3.0
+    ) -> dict[str, Any]:
         spikes = 0
         spike_indices = []
         for i in range(window, len(error_curve)):
@@ -183,7 +180,7 @@ class FalsificationProtocol:
 
     # ── Challenge 3: manifest integrity ────────────────────────────────────
 
-    def verify_manifest(self, current_manifest: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def verify_manifest(self, current_manifest: dict[str, Any] | None = None) -> dict[str, Any]:
         if current_manifest is None:
             current_manifest = {
                 "version": 1,
@@ -202,7 +199,7 @@ class FalsificationProtocol:
             "timestamp": self._now(),
         }
 
-    def record_manifest_mutation(self, new_manifest: Dict[str, Any]) -> Dict[str, Any]:
+    def record_manifest_mutation(self, new_manifest: dict[str, Any]) -> dict[str, Any]:
         verification = self.verify_manifest(new_manifest)
         if not verification["valid"]:
             log.warning("MANIFEST MUTATION DETECTED", current=verification["current"][:16])
@@ -210,7 +207,7 @@ class FalsificationProtocol:
 
     # ── Challenge 4: working-memory boundary ───────────────────────────────
 
-    def envelope_hash(self, envelope: Dict[str, Any], working_memory: List[str]) -> str:
+    def envelope_hash(self, envelope: dict[str, Any], working_memory: list[str]) -> str:
         """
         Hash envelope + working-memory fingerprint.
         Excluding working memory from this hash is the vulnerability;
@@ -224,7 +221,7 @@ class FalsificationProtocol:
         }
         return norm_hash(json_dumps_safe(state).encode())
 
-    def detect_semantic_drift(self, before: Dict[str, Any], after: Dict[str, Any]) -> float:
+    def detect_semantic_drift(self, before: dict[str, Any], after: dict[str, Any]) -> float:
         a_text = json_dumps_safe(before)
         b_text = json_dumps_safe(after)
         if not a_text and not b_text:
@@ -237,7 +234,7 @@ class FalsificationProtocol:
 
     # ── Challenge 5: normalization entropy ──────────────────────────────────
 
-    def normalize_and_hash(self, value: Any) -> Dict[str, Any]:
+    def normalize_and_hash(self, value: Any) -> dict[str, Any]:
         cleaned = strip_volatile(value, self.volatile_keys)
         raw_json = json_dumps_safe(value)
         clean_json = json_dumps_safe(cleaned)
@@ -254,13 +251,13 @@ class FalsificationProtocol:
 
     # ── Challenge 6: constraint-injected seeds ──────────────────────────────
 
-    def constraint_hash(self, seed: int, constraints: List[str], mutation: str) -> str:
+    def constraint_hash(self, seed: int, constraints: list[str], mutation: str) -> str:
         desc = f"seed={seed} constraints={sorted(constraints)} mutation={mutation}"
         return norm_hash(desc.encode("utf-8", errors="replace"))
 
     def detect_constraint_violation(
-        self, seed: int, constraints: List[str], mutation: str, baseline_hash: str
-    ) -> Dict[str, Any]:
+        self, seed: int, constraints: list[str], mutation: str, baseline_hash: str
+    ) -> dict[str, Any]:
         current_hash = self.constraint_hash(seed, constraints, mutation)
         caught = current_hash != baseline_hash
         return {
@@ -273,7 +270,7 @@ class FalsificationProtocol:
 
     # ── full protocol run ──────────────────────────────────────────────────
 
-    def full_audit(self, app_state: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def full_audit(self, app_state: dict[str, Any] | None = None) -> dict[str, Any]:
         if app_state:
             self.app_state = app_state
 
@@ -387,7 +384,7 @@ class FalsificationProtocol:
 
     # ── Challenge 7: world-state fingerprint ────────────────────────────────
 
-    def _classify_world_change(self, current: Dict[str, Any], baseline: Dict[str, Any], staleness_s: float) -> Dict[str, Any]:
+    def _classify_world_change(self, current: dict[str, Any], baseline: dict[str, Any], staleness_s: float) -> dict[str, Any]:
         current_keys = set((current or {}).keys())
         baseline_keys = set((baseline or {}).keys())
         added = sorted(current_keys - baseline_keys)
@@ -438,7 +435,7 @@ class FalsificationProtocol:
             "changed_value_count": len(changed_values),
         }
 
-    def reconcile_world_state(self, current: Dict[str, Any], record: bool = True) -> Dict[str, Any]:
+    def reconcile_world_state(self, current: dict[str, Any], record: bool = True) -> dict[str, Any]:
         if not current:
             return {"reconciled": False, "reason": "empty_world_snapshot"}
         old_baseline = getattr(self, "_last_world_baseline", None) or {}
@@ -458,7 +455,7 @@ class FalsificationProtocol:
                 self.world_change_history = self.world_change_history[-200:]
         return {"reconciled": True, "new_fingerprint": new_fp[:32], "changed": entry["changed"], "entry": entry}
 
-    def accept_world_change(self, change_id: Optional[int] = None, reason: str = "operator_accepted") -> Dict[str, Any]:
+    def accept_world_change(self, change_id: int | None = None, reason: str = "operator_accepted") -> dict[str, Any]:
         if not self.world_change_history:
             return {"accepted": False, "reason": "no_changes_to_accept"}
         target_idx = -1 if change_id is None else change_id
@@ -471,7 +468,7 @@ class FalsificationProtocol:
         self.world_change_history[target_idx] = entry
         return {"accepted": True, "change_id": target_idx, "entry": entry}
 
-    def is_world_change_acceptable(self, classification: Dict[str, Any]) -> bool:
+    def is_world_change_acceptable(self, classification: dict[str, Any]) -> bool:
         tol = self.world_change_tolerance
         allowed_types = set(tol.get("allowed_change_types", {"added", "value_change"}))
         severity = classification.get("severity", "none")
@@ -484,7 +481,7 @@ class FalsificationProtocol:
             and not classification.get("has_blocked_key", False)
         )
 
-    def _world_fingerprint(self, world_snapshot: Dict[str, Any]) -> str:
+    def _world_fingerprint(self, world_snapshot: dict[str, Any]) -> str:
         """
         Hash the observed external world state.
         A change here means the world changed even if internal state did not.
@@ -492,7 +489,7 @@ class FalsificationProtocol:
         cleaned = strip_volatile(world_snapshot or {}, {"timestamp", "requestId", "random", "session_id", "nonce"})
         return norm_hash(json_dumps_safe(cleaned).encode())
 
-    def detect_world_change(self, current: Dict[str, Any], baseline: Dict[str, Any]) -> Dict[str, Any]:
+    def detect_world_change(self, current: dict[str, Any], baseline: dict[str, Any]) -> dict[str, Any]:
         """
         Detect whether the external world has drifted from baseline.
         Returns severity, diff summary, and changed keys.
@@ -520,10 +517,10 @@ class FalsificationProtocol:
 
     def _verify_external_consistency(
         self,
-        observation: Dict[str, Any],
-        action: Dict[str, Any],
-        world_delta: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        observation: dict[str, Any],
+        action: dict[str, Any],
+        world_delta: dict[str, Any],
+    ) -> dict[str, Any]:
         """
         Verify that the agent's last action is consistent with the
         observed world state and the expected world delta.

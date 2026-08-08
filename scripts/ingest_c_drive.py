@@ -5,11 +5,10 @@ import argparse
 import json
 import os
 import sqlite3
-import sys
 import time
 import urllib.request
-from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 
 ROOT = Path(r"C:\Void\ZQM-AI-Master")
 DB_PATH = ROOT / "app" / "flatspace_local.db"

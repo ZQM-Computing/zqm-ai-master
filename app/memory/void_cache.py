@@ -16,8 +16,7 @@ import asyncio
 import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Dict, Generic, List, Optional, Tuple, TypeVar
+from typing import Any, TypeVar
 
 from app.core.config import settings
 from app.core.logger import get_logger
@@ -48,12 +47,12 @@ class CacheEntry:
     key: str
     value: Any
     created_at: float = field(default_factory=time.monotonic)
-    expires_at: Optional[float] = None      # absolute monotonic timestamp
+    expires_at: float | None = None      # absolute monotonic timestamp
     access_count: int = 0
     last_accessed: float = field(default_factory=time.monotonic)
     size_bytes: int = 0
-    tags: List[str] = field(default_factory=list)
-    task_id: Optional[str] = None         # Which task created this entry
+    tags: list[str] = field(default_factory=list)
+    task_id: str | None = None         # Which task created this entry
 
     @property
     def is_expired(self) -> bool:
@@ -93,7 +92,7 @@ class VoidCache:
         self,
         max_size: int = 512,
         strategy: str = "LRU",
-        default_ttl: Optional[int] = None,
+        default_ttl: int | None = None,
     ) -> None:
         self._max_size = max_size
         self._strategy = strategy.upper()
@@ -117,7 +116,7 @@ class VoidCache:
 
     # ── Public async API ──────────────────────────────────────────────────────
 
-    async def get(self, key: str) -> Optional[Any]:
+    async def get(self, key: str) -> Any | None:
         """
         Retrieve a cached value by key.
         Returns None if key doesn't exist or has expired.
@@ -147,9 +146,9 @@ class VoidCache:
         self,
         key: str,
         value: Any,
-        ttl: Optional[int] = None,
-        tags: Optional[List[str]] = None,
-        task_id: Optional[str] = None,
+        ttl: int | None = None,
+        tags: list[str] | None = None,
+        task_id: str | None = None,
     ) -> None:
         """
         Store a value in the cache.
@@ -242,8 +241,8 @@ class VoidCache:
         self,
         key: str,
         factory,
-        ttl: Optional[int] = None,
-        tags: Optional[List[str]] = None,
+        ttl: int | None = None,
+        tags: list[str] | None = None,
     ) -> Any:
         """
         Get cached value, or compute and cache it.
@@ -262,9 +261,9 @@ class VoidCache:
         await self.set(key, value, ttl=ttl, tags=tags)
         return value
 
-    async def multi_get(self, keys: List[str]) -> Dict[str, Any]:
+    async def multi_get(self, keys: list[str]) -> dict[str, Any]:
         """Fetch multiple keys at once. Returns dict of found key→value pairs."""
-        result: Dict[str, Any] = {}
+        result: dict[str, Any] = {}
         for key in keys:
             val = await self.get(key)
             if val is not None:
@@ -273,9 +272,9 @@ class VoidCache:
 
     async def multi_set(
         self,
-        items: Dict[str, Any],
-        ttl: Optional[int] = None,
-        tags: Optional[List[str]] = None,
+        items: dict[str, Any],
+        ttl: int | None = None,
+        tags: list[str] | None = None,
     ) -> None:
         """Store multiple key→value pairs."""
         for key, value in items.items():
@@ -292,7 +291,7 @@ class VoidCache:
         total = self._hits + self._misses
         return self._hits / total if total > 0 else 0.0
 
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         """Return cache performance statistics."""
         return {
             "strategy": self._strategy,
@@ -306,7 +305,7 @@ class VoidCache:
             "expirations": self._expirations,
         }
 
-    def keys(self) -> List[str]:
+    def keys(self) -> list[str]:
         """Return a snapshot of current cache keys (no lock — safe for GIL-protected read)."""
         return list(self._store.keys())
 
@@ -364,7 +363,7 @@ class VoidCache:
 
 # ── Module-level singleton ────────────────────────────────────────────────────
 
-_cache_instance: Optional[VoidCache] = None
+_cache_instance: VoidCache | None = None
 
 
 def get_void_cache() -> VoidCache:

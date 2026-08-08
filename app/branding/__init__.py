@@ -18,7 +18,7 @@ class BrandProfile:
     company_name: str
     support_email: str
     portal_url: str
-    theme: Dict[str, str]
+    theme: dict[str, str]
 
 
 class BrandingLayer:
@@ -34,12 +34,12 @@ class BrandingLayer:
             },
         )
 
-    def inject_headers(self, headers: Dict[str, str]) -> Dict[str, str]:
+    def inject_headers(self, headers: dict[str, str]) -> dict[str, str]:
         headers["X-Product-Name"] = self.profile.product_name
         headers["X-Support-Email"] = self.profile.support_email
         return headers
 
-    def portal_identity(self) -> Dict[str, str]:
+    def portal_identity(self) -> dict[str, str]:
         return {
             "product_name": self.profile.product_name,
             "company_name": self.profile.company_name,

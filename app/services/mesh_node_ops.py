@@ -3,13 +3,11 @@ from __future__ import annotations
 
 import asyncio
 import random
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
-from app.core.config import settings
+
 from app.core.logger import get_logger
-from app.services.observability_service import ObservabilityService
-from app.services.falsification_protocol import FalsificationProtocol
 
 log = get_logger("mesh-node-ops")
 
@@ -20,14 +18,14 @@ class MeshNodeOperations:
     def __init__(self, garden: GardenService) -> None:
         self.garden = garden
 
-    async def get_node_health_snapshot(self) -> List[Dict[str, Any]]:
+    async def get_node_health_snapshot(self) -> list[dict[str, Any]]:
         """Return richer health snapshots for every configured Garden node."""
         nodes = getattr(self.garden, "GARDEN_NODES", [])
         results = await asyncio.gather(
             *[self._probe_node(node) for node in nodes],
             return_exceptions=True,
         )
-        snapshot: List[Dict[str, Any]] = []
+        snapshot: list[dict[str, Any]] = []
         for node, result in zip(nodes, results):
             if isinstance(result, Exception):
                 snapshot.append(
@@ -42,7 +40,7 @@ class MeshNodeOperations:
                 snapshot.append(result)
         return snapshot
 
-    async def _probe_node(self, node: Dict[str, Any]) -> Dict[str, Any]:
+    async def _probe_node(self, node: dict[str, Any]) -> dict[str, Any]:
         if node.get("node_type") == "storage":
             endpoint = self.garden._endpoint(node, "/")
             health_path = "/"
@@ -52,7 +50,7 @@ class MeshNodeOperations:
         try:
             async with httpx.AsyncClient(timeout=3) as client:
                 resp = await client.get(endpoint)
-                data: Dict[str, Any] = {}
+                data: dict[str, Any] = {}
                 try:
                     data = resp.json()
                 except Exception:
@@ -84,10 +82,10 @@ class MeshNodeOperations:
                 "health_path": health_path,
             }
 
-    async def collect_node_metrics(self) -> Dict[str, Any]:
+    async def collect_node_metrics(self) -> dict[str, Any]:
         """Aggregate metrics across all nodes with per-node fallback."""
         raw = await self.garden.get_node_metrics()
-        aggregated: Dict[str, Any] = {
+        aggregated: dict[str, Any] = {
             "nodes_total": len(raw),
             "nodes_online": 0,
             "nodes_offline": 0,
@@ -107,8 +105,8 @@ class MeshNodeOperations:
         self,
         *,
         gpu_required: bool = False,
-        preferred_node: Optional[str] = None,
-    ) -> Optional[Dict[str, Any]]:
+        preferred_node: str | None = None,
+    ) -> dict[str, Any] | None:
         """Pick the best node by health + capability, not just first online."""
         if preferred_node:
             for n in getattr(self.garden, "GARDEN_NODES", []):
@@ -116,7 +114,7 @@ class MeshNodeOperations:
                     healthy = await self.garden._ping_node(n)
                     if healthy:
                         return n
-        candidates: List[tuple[bool, Dict[str, Any]]] = []
+        candidates: list[tuple[bool, dict[str, Any]]] = []
         for n in getattr(self.garden, "GARDEN_NODES", []):
             if gpu_required and not n.get("gpu"):
                 continue
@@ -130,7 +128,7 @@ class MeshNodeOperations:
             return None
         return random.choice(healthy_nodes)
 
-    async def migrate_job(self, job_id: str, from_node: str, to_node: str) -> Dict[str, Any]:
+    async def migrate_job(self, job_id: str, from_node: str, to_node: str) -> dict[str, Any]:
         """Best-effort job migration signal between garden nodes."""
         return {
             "job_id": job_id,
@@ -140,7 +138,7 @@ class MeshNodeOperations:
             "note": "Migration is advisory; actual replay depends on target node runtime.",
         }
 
-    async def convene_cross_node_action(self, action: Dict[str, Any]) -> Dict[str, Any]:
+    async def convene_cross_node_action(self, action: dict[str, Any]) -> dict[str, Any]:
         """Dispatch an action to the best node with failover."""
         task_id = action.get("task_id", "unknown")
         gpu_required = action.get("gpu_required", False)
@@ -165,7 +163,7 @@ class MeshNodeOperations:
             gpu_required=gpu_required,
         )
 
-    async def promote_backup_if_needed(self) -> Optional[Dict[str, Any]]:
+    async def promote_backup_if_needed(self) -> dict[str, Any] | None:
         """If primary is unhealthy, reroute coordination to a healthy backup."""
         primary = getattr(self.garden, "GARDEN_NODES", [])[0] if getattr(self.garden, "GARDEN_NODES", []) else None
         if not primary:

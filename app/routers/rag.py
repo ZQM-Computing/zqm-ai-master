@@ -8,24 +8,24 @@ End-to-end retrieval-augmented generation over local FLATSPACE memory.
 from __future__ import annotations
 
 import asyncio
-import urllib.parse
 import json
 import os
-from typing import Any, Dict, List, Optional, Tuple
+import urllib.parse
+from typing import Any
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
+from app.core.config import settings
 from app.core.logger import get_logger
 from app.core.security import get_current_token_payload
 from app.models.response import ZQM_AIResponse
-from app.core.config import settings
 
 router = APIRouter(prefix="/api/rag", tags=["RAG"])
 log = get_logger("router.rag")
 
 
-async def _searxng_search(query: str, limit: int = 5) -> List[Dict[str, Any]]:
+async def _searxng_search(query: str, limit: int = 5) -> list[dict[str, Any]]:
     """Fetch web results from SearXNG for query augmentation."""
     base = (settings.searxng_url or "").rstrip("/")
     if not base:
@@ -48,8 +48,8 @@ async def _searxng_search(query: str, limit: int = 5) -> List[Dict[str, Any]]:
         return []
 
 
-def _build_context(results: List[Dict[str, Any]]) -> str:
-    parts: List[str] = []
+def _build_context(results: list[dict[str, Any]]) -> str:
+    parts: list[str] = []
     for i, r in enumerate(results, 1):
         val = r.get("value")
         if isinstance(val, dict):
@@ -69,7 +69,7 @@ def _build_context(results: List[Dict[str, Any]]) -> str:
     return "\n\n".join(parts)
 
 
-def _embed_text(text: str) -> Optional[List[float]]:
+def _embed_text(text: str) -> list[float] | None:
     if not text:
         return None
     backend = os.getenv("RAG_RERANK_EMBEDDING_BACKEND", "ollama").lower()
@@ -108,9 +108,9 @@ def _embed_text(text: str) -> Optional[List[float]]:
 
 async def _rerank_results(
     query: str,
-    results: List[Dict[str, Any]],
+    results: list[dict[str, Any]],
     limit: int = 5,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Stage-2 rerank using configured embedding backend, with fallback policy."""
     if not results:
         return []
@@ -134,8 +134,8 @@ async def _rerank_results(
             return None
         return dot / (na * nb)
 
-    scored: List[Tuple[float, Dict[str, Any]]] = []
-    provenance: Dict[str, Any] = {"backend": os.getenv("RAG_RERANK_EMBEDDING_BACKEND", "ollama"), "query_chars": len(query)}
+    scored: list[tuple[float, dict[str, Any]]] = []
+    provenance: dict[str, Any] = {"backend": os.getenv("RAG_RERANK_EMBEDDING_BACKEND", "ollama"), "query_chars": len(query)}
     for item in results:
         vec_raw = item.get("embedding")
         vec = [float(x) for x in vec_raw] if isinstance(vec_raw, list) else None
@@ -154,8 +154,8 @@ async def _rerank_results(
 @router.post("/search")
 async def hybrid_search(
     request: Request,
-    body: Dict[str, Any],
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    body: dict[str, Any],
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> JSONResponse:
     """Hybrid RAG search: Meilisearch full-text + Chroma vector, reranked by bge-m3."""
     orch = getattr(request.app.state, "orchestrator", None)
@@ -200,9 +200,9 @@ async def hybrid_search(
 
     meili_hits, chroma_hits = await asyncio.gather(_meili(), _chroma())
 
-    merged: Dict[str, Dict[str, Any]] = {}
+    merged: dict[str, dict[str, Any]] = {}
 
-    def _ingest(hit: Dict[str, Any], score_source: str) -> None:
+    def _ingest(hit: dict[str, Any], score_source: str) -> None:
         key = hit.get("key")
         if not key:
             return
@@ -284,17 +284,17 @@ async def hybrid_search(
 @router.get("/diag")
 async def diag(
     request: Request,
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> JSONResponse:
     """Diagnostic RAG path: retrieval + generation without web augmentation."""
     orch = getattr(request.app.state, "orchestrator", None)
     fs = getattr(orch, "flatspace", None) if orch else None
-    results: List[Dict[str, Any]] = []
+    results: list[dict[str, Any]] = []
     context = ""
-    sources: List[Dict[str, Any]] = []
+    sources: list[dict[str, Any]] = []
     answer = ""
     model_used = None
-    error: Optional[str] = None
+    error: str | None = None
     if fs is None:
         error = "orchestrator or flatspace missing"
     else:
@@ -308,8 +308,8 @@ async def diag(
             ]
             if context:
                 try:
-                    from app.services.mesh_ollama import router as mesh_ollama
                     from app.core.config import settings as _rag_settings
+                    from app.services.mesh_ollama import router as mesh_ollama
                     mesh = getattr(orch, "mesh", None) or mesh_ollama
                     prompt = (
                         "You are a careful assistant. "
@@ -350,8 +350,8 @@ async def diag(
 @router.post("/query")
 async def query(
     request: Request,
-    body: Dict[str, Any],
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    body: dict[str, Any],
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> JSONResponse:
     """
     RAG query: retrieve top-k FLATSPACE chunks and generate a grounded answer.
@@ -385,7 +385,7 @@ async def query(
     ]
 
     # Optional rerank stage using configured reranker backend.
-    reranked: List[Dict[str, Any]] = []
+    reranked: list[dict[str, Any]] = []
     try:
         reranked = await _rerank_results(query_text, results, limit=max(1, limit))
     except Exception as exc:
@@ -400,7 +400,7 @@ async def query(
 
     # Optional web augmentation via SearXNG
     web_context = ""
-    web_sources: List[Dict[str, Any]] = []
+    web_sources: list[dict[str, Any]] = []
     if web_augment:
         try:
             web_results = await _searxng_search(query_text, limit=settings.searxng_max_results)
@@ -440,8 +440,8 @@ async def query(
         prompt_parts.append(f"\n\nQuestion: {query_text}\n\nAnswer:")
         prompt = "\n".join(prompt_parts)
         try:
-            from app.services.mesh_ollama import router as mesh_ollama
             from app.core.config import settings as _rag_settings
+            from app.services.mesh_ollama import router as mesh_ollama
             mesh = getattr(orch, "mesh", None) or mesh_ollama
             data = await mesh.chat(
                 _rag_settings.ollama_default_model,

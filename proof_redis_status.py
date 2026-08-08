@@ -1,6 +1,6 @@
 """Proof: /api/status redis=ok after redis_service.py logging fix."""
-import urllib.request
 import json
+import urllib.request
 
 BASE = "http://127.0.0.1:8808"
 

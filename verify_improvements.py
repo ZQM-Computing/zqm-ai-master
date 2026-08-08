@@ -1,4 +1,7 @@
-import urllib.request, json, time, sys, subprocess, os
+import json
+import subprocess
+import sys
+import urllib.request
 
 base = 'http://127.0.0.1:8808'
 login = urllib.request.Request(base + '/api/users/login',
@@ -6,7 +9,7 @@ login = urllib.request.Request(base + '/api/users/login',
     headers={'Content-Type': 'application/json'}, method='POST')
 with urllib.request.urlopen(login, timeout=20) as r:
     token = json.loads(r.read())['data']['access_token']
-H = {**{'Authorization': 'Bearer ' + token}, 'Content-Type': 'application/json'}
+H = {'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'}
 
 proofs = []
 

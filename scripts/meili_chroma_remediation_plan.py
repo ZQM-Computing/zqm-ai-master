@@ -4,7 +4,7 @@ Remediation plan + executable commands for the Meilisearch/Chroma indexing gap.
 Findings:
 - Meilisearch is running at 127.0.0.1:7701, but `.env` contains an invalid
   `MEILISEARCH_MASTER_KEY`, so indexing/search is failing auth.
-- Local SQLite truth: `C:\Void\ZQM-AI-Master\app\flatspace_local.db` has 923 records.
+- Local SQLite truth: `C:\\Void\\ZQM-AI-Master\app\flatspace_local.db` has 923 records.
 - Meilisearch currently only has 200 docs.
 - Chroma is configured in code but `chroma_enabled=False` by default and no
   Chroma service is reachable at 127.0.0.1:8001.
@@ -21,7 +21,7 @@ EXACT COMMANDS:
 1. Inspect local SQLite truth:
    python - <<'PY'
    import sqlite3, os
-   p=r'C:\Void\ZQM-AI-Master\app\flatspace_local.db'
+   p=r'C:\\Void\\ZQM-AI-Master\app\flatspace_local.db'
    print('exists', os.path.exists(p))
    if os.path.exists(p):
        c=sqlite3.connect(p)
@@ -35,7 +35,7 @@ EXACT COMMANDS:
    curl -s http://127.0.0.1:7701/healthz || true
 
 3. Option A - Use existing master key if known:
-   - If you have the real key, edit `C:\Void\ZQM-AI-Master\.env`:
+   - If you have the real key, edit `C:\\Void\\ZQM-AI-Master\\.env`:
        MEILISEARCH_MASTER_KEY=<existing_valid_key>
    - Verify:
        curl -s http://127.0.0.1:7701/indexes -H "Authorization: Bearer <key>" -H "Content-Type: application/json"
@@ -49,7 +49,7 @@ EXACT COMMANDS:
    #   MEILISEARCH_MASTER_KEY=<new_key>
 
 4. Reindex into Meilisearch:
-   cd C:\Void\ZQM-AI-Master
+   cd C:\\Void\\ZQM-AI-Master
    python scripts/sync_meili.py
    # or with explicit env:
    set MEILISEARCH_URL=http://127.0.0.1:7701

@@ -1,7 +1,8 @@
 """Unit tests for password hashing and JWT."""
+from datetime import UTC, datetime, timedelta
+
 import pytest
-from jose import jwt, JWTError
-from datetime import datetime, timezone, timedelta
+from jose import JWTError, jwt
 
 try:
     import bcrypt
@@ -36,7 +37,7 @@ def test_jwt_payload_structure():
 def test_jwt_expiry():
     """Expired tokens should raise."""
     secret = "test_secret_key_for_unit_tests_only"
-    past = datetime.now(timezone.utc) - timedelta(hours=1)
+    past = datetime.now(UTC) - timedelta(hours=1)
     payload = {"sub": "user", "exp": past}
     token = jwt.encode(payload, secret, algorithm="HS256")
     with pytest.raises(JWTError):

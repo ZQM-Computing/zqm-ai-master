@@ -17,7 +17,7 @@ def redact_internal_ips(text: str) -> str:
     return re.sub(r"192\.168\.\d+\.\d+", "[REDACTED]", text)
 
 
-def strip_debug_logs(log_dir: str) -> List[str]:
+def strip_debug_logs(log_dir: str) -> list[str]:
     removed = []
     for root, dirs, files in os.walk(log_dir):
         for name in files:
@@ -31,7 +31,7 @@ def strip_debug_logs(log_dir: str) -> List[str]:
     return removed
 
 
-def require_secret_rotation(env_path: str) -> List[str]:
+def require_secret_rotation(env_path: str) -> list[str]:
     warnings = []
     if not os.path.exists(env_path):
         return warnings

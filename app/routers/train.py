@@ -5,13 +5,11 @@ Accepts distributed training jobs and runs LoRA fine-tuning.
 """
 from __future__ import annotations
 
-import argparse
-import json
 import os
 import sys
 import time
 import uuid
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
@@ -23,10 +21,10 @@ router = APIRouter(prefix="/api/train", tags=["Training"])
 log = get_logger("router.train")
 
 # In-memory job registry (replace with DB in production)
-_TRAIN_JOBS: Dict[str, Dict[str, Any]] = {}
+_TRAIN_JOBS: dict[str, dict[str, Any]] = {}
 
 
-def _run_training_job(job_id: str, params: Dict[str, Any]) -> None:
+def _run_training_job(job_id: str, params: dict[str, Any]) -> None:
     """Background training runner."""
     _TRAIN_JOBS[job_id]["status"] = "running"
     _TRAIN_JOBS[job_id]["started_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
@@ -35,7 +33,6 @@ def _run_training_job(job_id: str, params: Dict[str, Any]) -> None:
         root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         sys.path.insert(0, root)
         os.chdir(root)
-        import importlib
         for mod in ["app.orchestrator.agent_registry", "app.orchestrator.zqm_ai_orchestrator"]:
             sys.modules.pop(mod, None)
         from scripts.train_lora import train_lora as _train_lora
@@ -84,8 +81,8 @@ def _run_training_job(job_id: str, params: Dict[str, Any]) -> None:
 @router.post("/lora")
 async def submit_lora_job(
     request: Request,
-    body: Dict[str, Any],
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    body: dict[str, Any],
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> JSONResponse:
     """Submit a LoRA fine-tuning job."""
     job_id = str(uuid.uuid4())
@@ -112,7 +109,7 @@ async def submit_lora_job(
 @router.get("/lora/{job_id}")
 async def get_job_status(
     job_id: str,
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> JSONResponse:
     """Get status of a training job."""
     job = _TRAIN_JOBS.get(job_id)
@@ -123,7 +120,7 @@ async def get_job_status(
 
 @router.get("/lora")
 async def list_jobs(
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> JSONResponse:
     """List all training jobs."""
     return JSONResponse({"jobs": list(_TRAIN_JOBS.values())})
@@ -132,7 +129,7 @@ async def list_jobs(
 @router.delete("/lora/{job_id}")
 async def cancel_job(
     job_id: str,
-    auth: Dict[str, Any] = Depends(require_admin),
+    auth: dict[str, Any] = Depends(require_admin),
 ) -> JSONResponse:
     """Cancel a training job."""
     job = _TRAIN_JOBS.get(job_id)

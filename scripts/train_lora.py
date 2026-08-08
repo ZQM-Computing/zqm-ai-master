@@ -6,10 +6,7 @@ Target: train small adapters and merge them for Ollama serving.
 from __future__ import annotations
 
 import argparse
-import json
 import os
-import sys
-from typing import Optional
 
 
 def _available(package: str) -> bool:
@@ -43,7 +40,7 @@ def train_lora(
     lora_rank: int = 8,
     lora_alpha: int = 16,
     learning_rate: float = 2e-4,
-    target_modules: Optional[list] = None,
+    target_modules: list | None = None,
 ) -> str:
     missing = []
     for pkg in ["torch", "transformers", "peft", "bitsandbytes", "datasets"]:
@@ -59,9 +56,9 @@ def train_lora(
         AutoModelForCausalLM,
         AutoTokenizer,
         BitsAndBytesConfig,
-        TrainingArguments,
-        Trainer,
         DataCollatorForLanguageModeling,
+        Trainer,
+        TrainingArguments,
     )
 
     print(f"Loading base model: {base_model}")

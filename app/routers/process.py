@@ -8,13 +8,13 @@ Primary AI task submission and execution endpoint.
 from __future__ import annotations
 
 import time
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.core.logger import get_logger
 from app.core.security import get_current_token_payload
-from app.models.response import ErrorResponse, ZQM_AIResponse
+from app.models.response import ZQM_AIResponse
 from app.models.task import TaskRequest, TaskResult
 
 router = APIRouter(prefix="/api/process", tags=["Process"])
@@ -42,7 +42,7 @@ log = get_logger("router.process")
 async def process_task(
     request_body: TaskRequest,
     request: Request,
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> ZQM_AIResponse:
     """
     Execute an AI task through The Void cognitive processing pipeline.
@@ -125,7 +125,7 @@ async def process_task(
 async def task_history(
     request: Request,
     limit: int = 100,
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> ZQM_AIResponse:
     """Return completed/failed task history. Reads the durable FLATSPACE
     `task:*` records so history survives a process restart (merged with
@@ -158,7 +158,7 @@ async def task_history(
 async def get_task(
     task_id: str,
     request: Request,
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> ZQM_AIResponse:
     """Retrieve the current status and result of a previously submitted task."""
     orchestrator = getattr(request.app.state, "orchestrator", None)
@@ -205,7 +205,7 @@ async def get_task(
 )
 async def list_active_tasks(
     request: Request,
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> ZQM_AIResponse:
     """Return all currently active (in-progress) tasks."""
     orchestrator = getattr(request.app.state, "orchestrator", None)

@@ -5,15 +5,13 @@ Ticket creation and status for commercial customers.
 """
 from __future__ import annotations
 
-import json
 import os
-from datetime import datetime, timezone
-from typing import Any, Dict
+from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 
-from app.core.config import settings
 from app.core.logger import get_logger
 from app.core.security import get_current_token_payload
 
@@ -29,12 +27,12 @@ async def support_status() -> JSONResponse:
         "support_email": os.getenv("BRAND_SUPPORT_EMAIL", "zqmcomputing@gmail.com"),
         "docs_url": os.getenv("BRAND_PORTAL_URL", "http://localhost:8808/docs"),
         "status": "operational",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     })
 
 
 @router.get("/metrics")
-async def support_metrics(auth: Dict[str, Any] = Depends(get_current_token_payload)) -> JSONResponse:
+async def support_metrics(auth: dict[str, Any] = Depends(get_current_token_payload)) -> JSONResponse:
     """Support ticket volume and resolution metrics."""
     try:
         from app.services.flatspace_service import FlatSpaceService
@@ -52,7 +50,7 @@ async def support_metrics(auth: Dict[str, Any] = Depends(get_current_token_paylo
 
 
 @router.post("/ticket")
-async def create_ticket(request: Request, auth: Dict[str, Any] = Depends(get_current_token_payload)) -> JSONResponse:
+async def create_ticket(request: Request, auth: dict[str, Any] = Depends(get_current_token_payload)) -> JSONResponse:
     """
     Create a support ticket.
     Body: {"subject": "...", "priority": "low|medium|high|critical", "body": "..."}
@@ -65,7 +63,7 @@ async def create_ticket(request: Request, auth: Dict[str, Any] = Depends(get_cur
     if not subject or not body_text:
         raise HTTPException(status_code=400, detail="subject and body are required")
 
-    ticket_id = f"support-{int(datetime.now(timezone.utc).timestamp())}"
+    ticket_id = f"support-{int(datetime.now(UTC).timestamp())}"
     ticket = {
         "ticket_id": ticket_id,
         "subject": subject,
@@ -73,7 +71,7 @@ async def create_ticket(request: Request, auth: Dict[str, Any] = Depends(get_cur
         "body": body_text,
         "status": "open",
         "created_by": auth.get("username", "unknown"),
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
     }
 
     try:

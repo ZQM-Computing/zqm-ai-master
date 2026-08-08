@@ -1,4 +1,8 @@
-import urllib.request, json, time, statistics
+import json
+import statistics
+import time
+import urllib.request
+
 BASE = "http://127.0.0.1:8808"
 
 def login():
@@ -21,7 +25,7 @@ def bench_get(token, path, n=10):
             with urllib.request.urlopen(req, timeout=180) as r:
                 r.read()
                 times.append(time.time() - start)
-        except Exception as e:
+        except Exception:
             times.append(None)
     return times
 
@@ -42,7 +46,7 @@ def bench_process(token, n=5):
             with urllib.request.urlopen(req, timeout=220) as r:
                 r.read()
                 times.append(time.time() - start)
-        except Exception as e:
+        except Exception:
             times.append(None)
     return times
 

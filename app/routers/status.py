@@ -8,16 +8,15 @@ System health and status endpoints.
 from __future__ import annotations
 
 from collections import deque
-from statistics import mean
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import Response
 
+from app.core.config import settings
 from app.core.logger import get_logger
 from app.core.security import get_current_token_payload
 from app.models.response import ZQM_AIResponse
-from app.core.config import settings
 
 router = APIRouter(prefix="/api/status", tags=["Status"])
 log = get_logger("router.status")
@@ -33,7 +32,7 @@ _recent_latency: deque[float] = deque(maxlen=20)
 )
 async def get_status(
     request: Request,
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> ZQM_AIResponse:
     """
     Returns the health status of The Void and all connected ZQM subsystems:
@@ -102,7 +101,7 @@ async def ping() -> dict:
 )
 async def prometheus_metrics(
     request: Request,
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> Response:
     """Prometheus metrics endpoint for scraping."""
     orchestrator = getattr(request.app.state, "orchestrator", None)
@@ -135,7 +134,7 @@ async def prometheus_metrics(
 async def get_history(
     request: Request,
     limit: int = 50,
-    auth: Dict[str, Any] = Depends(get_current_token_payload),
+    auth: dict[str, Any] = Depends(get_current_token_payload),
 ) -> ZQM_AIResponse:
     """Return recent task execution history."""
     orchestrator = getattr(request.app.state, "orchestrator", None)

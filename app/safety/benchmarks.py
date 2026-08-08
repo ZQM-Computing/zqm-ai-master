@@ -3,10 +3,10 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
-def load_toxicity_dataset(path: Optional[str] = None) -> Dict[str, Any]:
+def load_toxicity_dataset(path: str | None = None) -> dict[str, Any]:
     if path is None:
         path = os.path.join("data", "safety_toxicity.jsonl")
     if not os.path.exists(path):
@@ -24,7 +24,7 @@ def load_toxicity_dataset(path: Optional[str] = None) -> Dict[str, Any]:
     return {"count": len(samples), "samples": samples}
 
 
-def evaluate_on_dataset(samples: List[Dict[str, Any]], text_key: str = "text") -> Dict[str, Any]:
+def evaluate_on_dataset(samples: list[dict[str, Any]], text_key: str = "text") -> dict[str, Any]:
     from app.safety.checks import run_safety_checks
 
     results = []

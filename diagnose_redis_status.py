@@ -1,9 +1,11 @@
 """Diagnose why /api/status reports redis=unreachable despite healthy container."""
 import asyncio
-import urllib.request
 import json
-from app.services.redis_service import RedisService
+import urllib.request
+
 from app.core.config import Settings
+from app.services.redis_service import RedisService
+
 
 async def main():
     settings = Settings()
@@ -40,6 +42,7 @@ async def main():
 
     # Check app.state.redis via test client
     from fastapi.testclient import TestClient
+
     from app.main import app
     client = TestClient(app)
     redis_state = getattr(app.state, "redis", None)

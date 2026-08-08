@@ -28,8 +28,7 @@ import json
 import os
 import subprocess
 import tempfile
-import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from fastapi import APIRouter, Depends, Request
 
@@ -101,7 +100,7 @@ except Exception as e:
 
 # ── node resolution ────────────────────────────────────────────────────────────
 
-def _nodes() -> List[str]:
+def _nodes() -> list[str]:
     """Ordered list of configured quantum nodes."""
     multi = os.environ.get("QUANTUM_LLM_SSH_NODES", "").strip()
     if multi:
@@ -112,13 +111,13 @@ def _nodes() -> List[str]:
     return list(_DEFAULT_NODES)
 
 
-def _local_python() -> Optional[str]:
+def _local_python() -> str | None:
     return os.environ.get("QUANTUM_LLM_PYTHON", "").strip() or None
 
 
 # ── execution primitives ──────────────────────────────────────────────────────
 
-def _run_local(py: str, mode: str, payload: Optional[str], timeout: int) -> Dict[str, Any]:
+def _run_local(py: str, mode: str, payload: str | None, timeout: int) -> dict[str, Any]:
     with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False, encoding="utf-8") as f:
         f.write(_DRIVER)
         drv = f.name
@@ -155,7 +154,7 @@ def _detect_remote_python(ssh_client) -> str:
     return "py -3.12"
 
 
-def _run_ssh(target: str, mode: str, payload: Optional[str], timeout: int) -> Dict[str, Any]:
+def _run_ssh(target: str, mode: str, payload: str | None, timeout: int) -> dict[str, Any]:
     try:
         import paramiko
     except ImportError:
@@ -164,7 +163,7 @@ def _run_ssh(target: str, mode: str, payload: Optional[str], timeout: int) -> Di
     user, _, host = target.partition("@")
     if not host:
         user, host = "zqmlocal", target
-    last: Dict[str, Any] = {"status": "error", "error": "ssh exhausted retries"}
+    last: dict[str, Any] = {"status": "error", "error": "ssh exhausted retries"}
     for attempt in range(3):
         try:
             c = paramiko.SSHClient()
@@ -182,7 +181,7 @@ def _run_ssh(target: str, mode: str, payload: Optional[str], timeout: int) -> Di
                 sftp = c.open_sftp()
                 try:
                     sftp.stat("/Temp")
-                except IOError:
+                except OSError:
                     c.exec_command("cmd /c mkdir C:\\Temp")
                 with sftp.open(remote_py, "w") as f:
                     f.write(_DRIVER)
@@ -272,7 +271,7 @@ def _run_ssh(target: str, mode: str, payload: Optional[str], timeout: int) -> Di
     return last
 
 
-def _run_on(target: str, mode: str, payload: Optional[str], timeout: int) -> Dict[str, Any]:
+def _run_on(target: str, mode: str, payload: str | None, timeout: int) -> dict[str, Any]:
     local = _local_python()
     if local:
         return {"transport": "local", "interpreter": local, "node": "local",
@@ -281,16 +280,16 @@ def _run_on(target: str, mode: str, payload: Optional[str], timeout: int) -> Dic
             **_run_ssh(target, mode, payload, timeout)}
 
 
-def _run(mode: str, payload: Optional[str] = None, timeout: int = 240,
-         prefer: Optional[str] = None) -> Dict[str, Any]:
+def _run(mode: str, payload: str | None = None, timeout: int = 240,
+         prefer: str | None = None) -> dict[str, Any]:
     local = _local_python()
     if local:
         return _run_on("local", mode, payload, timeout)
     nodes = _nodes()
     if prefer and prefer in nodes:
         nodes = [prefer] + [n for n in nodes if n != prefer]
-    last_err: Dict[str, Any] = {"status": "error", "error": "no nodes configured"}
-    healthy: List[str] = []
+    last_err: dict[str, Any] = {"status": "error", "error": "no nodes configured"}
+    healthy: list[str] = []
     for node in nodes:
         res = _run_on(node, "verify", None, 60)
         if res.get("status") == "ok":
@@ -320,7 +319,7 @@ def _run(mode: str, payload: Optional[str] = None, timeout: int = 240,
 
 @router.get("/health", summary="quantum_llm bridge health (active node)")
 async def health(request: Request,
-                 auth: Dict[str, Any] = Depends(get_current_token_payload)) -> Dict[str, Any]:
+                 auth: dict[str, Any] = Depends(get_current_token_payload)) -> dict[str, Any]:
     nodes = _nodes()
     if not nodes and not _local_python():
         return {"configured": False, "status": "disabled"}
@@ -329,13 +328,13 @@ async def health(request: Request,
 
 @router.get("/verify", summary="quantum_llm admin.verify() on active node")
 async def verify(request: Request,
-                 auth: Dict[str, Any] = Depends(get_current_token_payload)) -> Dict[str, Any]:
+                 auth: dict[str, Any] = Depends(get_current_token_payload)) -> dict[str, Any]:
     return _run("verify")
 
 
 @router.get("/nodes", summary="mesh sweep: health+verify of every quantum node")
 async def nodes(request: Request,
-                auth: Dict[str, Any] = Depends(get_current_token_payload)) -> Dict[str, Any]:
+                auth: dict[str, Any] = Depends(get_current_token_payload)) -> dict[str, Any]:
     local = _local_python()
     if local:
         return {"nodes": [{"node": "local", **_run_on("local", "verify", None, 60)}]}
@@ -363,13 +362,13 @@ async def nodes(request: Request,
 
 @router.get("/models", summary="quantum_llm.admin.inventory() on active node")
 async def models(request: Request,
-                 auth: Dict[str, Any] = Depends(get_current_token_payload)) -> Dict[str, Any]:
+                 auth: dict[str, Any] = Depends(get_current_token_payload)) -> dict[str, Any]:
     return _run("models")
 
 
 @router.post("/infer", summary="hybrid quantum-classical inference on active node")
 async def infer(request: Request,
-                auth: Dict[str, Any] = Depends(get_current_token_payload)) -> Dict[str, Any]:
+                auth: dict[str, Any] = Depends(get_current_token_payload)) -> dict[str, Any]:
     try:
         body = await request.json()
     except Exception:
@@ -379,7 +378,7 @@ async def infer(request: Request,
 
 @router.post("/retrieve", summary="quantum_retrieval query on active node")
 async def retrieve(request: Request,
-                   auth: Dict[str, Any] = Depends(get_current_token_payload)) -> Dict[str, Any]:
+                   auth: dict[str, Any] = Depends(get_current_token_payload)) -> dict[str, Any]:
     try:
         body = await request.json()
     except Exception:
