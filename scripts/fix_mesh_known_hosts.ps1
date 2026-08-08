@@ -10,7 +10,7 @@ Requires OpenSSH client available in PATH. Runs under normal user context.
 #>
 
 $ErrorActionPreference = 'Stop'
-$knownHosts = Join-Path $env:USERPROFILE '.ssh' 'known_hosts'
+$knownHosts = Join-Path (Join-Path $env:USERPROFILE '.ssh') 'known_hosts'
 if (-not (Test-Path $knownHosts)) {
     Write-Host "No known_hosts at $knownHosts - nothing to fix."
     exit 0
