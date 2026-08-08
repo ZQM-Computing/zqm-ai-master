@@ -130,3 +130,47 @@ async def get_info(request: Request) -> ZQM_AIResponse:
         data=info,
         message="System information retrieved successfully",
     )
+
+
+@router.get(
+    "/integration/status",
+    response_model=ZQM_AIResponse,
+    summary="Integration readiness",
+    description="Public view of runtime config for optional ZQM ecosystem integrations.",
+)
+async def integration_status(request: Request) -> ZQM_AIResponse:
+    from app.core.config import settings as _integration_settings
+
+    try:
+        eps = []
+        for rt in request.app.routes:
+            path = getattr(rt, "path", "")
+            methods = getattr(rt, "methods", None)
+            if methods and path.startswith("/api"):
+                methods_clean = ",".join(sorted(m for m in methods if m != "HEAD"))
+                summary = (rt.summary or rt.description or "").split("\n")[0][:80]
+                eps.append({"path": path, "method": methods_clean, "summary": summary})
+    except Exception:
+        eps = []
+
+    base_payload = {
+        "ready": True,
+        "mounts": eps,
+        "endpoints": {
+            "garden": _integration_settings.garden_endpoint,
+            "flatspace": _integration_settings.flatspace_endpoint,
+            "observability": _integration_settings.observability_endpoint,
+            "network": _integration_settings.network_endpoint,
+            "intel_platforms": _integration_settings.zqm_intel_platforms_url,
+            "redis": _integration_settings.redis_url,
+        },
+        "settings": {
+            "version": _integration_settings.app_version,
+            "host": _integration_settings.host,
+            "port": _integration_settings.port,
+        },
+    }
+    return ZQM_AIResponse.ok(
+        data=base_payload,
+        message="Integration status retrieved successfully",
+    )

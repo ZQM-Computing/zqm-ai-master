@@ -40,14 +40,56 @@ The Void AI Orchestration System — local-first RAG, reasoning, mesh ops, and c
 
 ## Integration: zqm-intel-platforms
 
-This repo integrates with `zqm-intel-platforms` for shared OSINT/CTI/SIEM/Windows-telemetry primitives.
+`zqm-ai-master` integrates with `zqm-intel-platforms` for shared OSINT/CTI/SIEM/Windows-telemetry primitives. The integration is optional; core installs do not pull it in automatically.
 
-- Evidence ingestion: council findings are mirrored into flatspace/observability/garden/redis via `initialize_integrations()`.
-- Telemetry routing: observability events, council session summaries, and mesh metrics are pushed to the intel platform through optional service hooks in `app/orchestrator/void_council.py`.
-- Operational handoff: `scripts/verify_falsification_integration.py` validates cross-system consistency between Void outputs and intel platform expectations.
-- CLI bridge: `zqm-ai-master council-domains`, `council-history`, `council-convene`, `void-talk`, and `self-improve` expose the integration surface without touching raw HTTP.
+**Install**
 
-See `docs/VOID_INTEGRATION.md` for wiring, runtime checks, and operator commands.
+```bash
+# With intel-platforms extras
+pip install 'zqm-ai-master[intel-platforms]'
+
+# Or standalone
+pip install 'zqm-intel-platforms[all]>=0.1.0'
+```
+
+**Wire the runtime**
+
+The VoidCouncil runtime can attach the intel platform as push targets inside `initialize_integrations()`.
+
+```bash
+export ZQM_INTEL_PLATFORMS_URL="http://127.0.0.1:9400"
+export ZQM_OBSERVABILITY_URL="http://127.0.0.1:9090"
+export ZQM_FLATSPACE_URL="http://127.0.0.1:8080"
+export ZQM_GARDEN_URL="http://127.0.0.1:8761"
+export ZQM_REDIS_URL="redis://127.0.0.1:6379/0"
+```
+
+Start the master service and let the router layer resolve the active config:
+
+```bash
+zqm-ai-master serve --host 127.0.0.1 --port 8808 --reload
+```
+
+Convene a council session to exercise the integration surface:
+
+```bash
+zqm-ai-master council-convene --host 127.0.0.1 --port 8808 --domain reliability
+zqm-ai-master council-history --host 127.0.0.1 --port 8808 --limit 20
+zqm-ai-master self-improve --host 127.0.0.1 --port 8808
+```
+
+**Verify**
+
+```bash
+curl -s http://127.0.0.1:8808/api/version
+curl -s http://127.0.0.1:8808/api/integration/status
+```
+
+If `zqm-intel-platforms` is not installed, integration status reports `unavailable`; install the extra to enable pushes.
+
+**Docs**
+
+See `docs/VOID_INTEGRATION.md` for full wiring details.
 
 ## License
 

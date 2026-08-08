@@ -277,6 +277,14 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("zqm_internal_key", "ZQM_INTERNAL_KEY"),
     )
 
+    # ── ZQM Intel Platforms ──────────────────────────────────────────────────
+    zqm_intel_platforms_url: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "zqm_intel_platforms_url", "ZQM_INTEL_PLATFORMS_URL"
+        ),
+    )
+
     # ── AI Providers ──────────────────────────────────────────────────────────
     openai_api_key: str = ""
     openai_default_model: str = "gpt-4o"

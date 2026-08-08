@@ -27,6 +27,9 @@ prod = [
     "tiktoken>=0.13.0",
     "lm_eval>=0.4.12",
 ]
+intel-platforms = [
+    "zqm-intel-platforms[all]>=0.1.0",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]

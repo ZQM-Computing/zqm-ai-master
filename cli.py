@@ -17,6 +17,7 @@ Usage:
   zqm-ai-master council-convene [--host HOST] [--port PORT] [--domain DOMAIN] [--auto-apply]
   zqm-ai-master void-talk [--host HOST] [--port PORT] [--message MSG]
   zqm-ai-master self-improve [--host HOST] [--port PORT]
+  zqm-ai-master integrations [--host HOST] [--port PORT]
 """
 from __future__ import annotations
 
@@ -280,6 +281,10 @@ def cmd_self_improve(args: argparse.Namespace) -> int:
     return _request_post(args, "/api/self-improve/run", {})
 
 
+def cmd_integrations(args: argparse.Namespace) -> int:
+    return _request(args, "/api/integration/status")
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="zqm-ai-master")
     ap.add_argument("--host", default="127.0.0.1")
@@ -314,6 +319,7 @@ def main(argv: list[str] | None = None) -> int:
     p_void_talk = sub.add_parser("void-talk")
     p_void_talk.add_argument("--message", default=None)
     p_self_improve = sub.add_parser("self-improve")
+    p_integrations = sub.add_parser("integrations")
 
     ns = ap.parse_args(argv)
     if not ns.command:
@@ -337,6 +343,7 @@ def main(argv: list[str] | None = None) -> int:
         "council-convene": cmd_council_convene,
         "void-talk": cmd_void_talk,
         "self-improve": cmd_self_improve,
+        "integrations": cmd_integrations,
     }
     fn = mapping.get(ns.command)
     if fn is None:
