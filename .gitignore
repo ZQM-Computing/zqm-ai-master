@@ -44,3 +44,4 @@ dist/
 
 # Docker/compose local artifacts
 docker-compose.override.yml
+debug_redis_*.txt

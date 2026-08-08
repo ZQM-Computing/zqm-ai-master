@@ -97,7 +97,7 @@ def _mesh_evidence(base_path: str = "http://127.0.0.1:8808") -> List[str]:
 
 def _status_code_evidence(base_path: str = "http://127.0.0.1:8808") -> List[str]:
     out: List[str] = []
-    for path in ["/api/status", "/api/garden/metrics"]:
+    for path in ["/api/healthz", "/api/version"]:
         url = f"{base_path}{path}"
         try:
             with urllib.request.urlopen(url, timeout=6.0) as resp:
