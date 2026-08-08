@@ -270,6 +270,9 @@ class MeshOllamaRouter:
             await self.refresh(force=True)
             backends = self._ranked_backends(model)
 
+        # Prefer healthier backends: sort by failure count (lower = better).
+        backends = sorted(backends, key=lambda b: self._status_failures.get(b["name"], 0))
+
         if backends:
             for b in backends:
                 try:

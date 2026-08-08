@@ -204,6 +204,82 @@ class Settings(BaseSettings):
     eden_endpoint: str = "http://192.168.1.228:8443/api/auth"
     eden_enabled: bool = False
 
+    # ── SSO / OIDC ─────────────────────────────────────────────────────────────
+    sso_oidc_issuer: str = Field(
+        default="",
+        validation_alias=AliasChoices("sso_oidc_issuer", "SSO_OIDC_ISSUER"),
+    )
+    sso_oidc_client_id: str = Field(
+        default="",
+        validation_alias=AliasChoices("sso_oidc_client_id", "SSO_OIDC_CLIENT_ID"),
+    )
+    sso_oidc_client_secret: str = Field(
+        default="",
+        validation_alias=AliasChoices("sso_oidc_client_secret", "SSO_OIDC_CLIENT_SECRET"),
+    )
+    sso_oidc_metadata_url: str = Field(
+        default="",
+        validation_alias=AliasChoices("sso_oidc_metadata_url", "SSO_OIDC_METADATA_URL"),
+    )
+    sso_oidc_default_redirect_uri: str = Field(
+        default="",
+        validation_alias=AliasChoices("sso_oidc_default_redirect_uri", "SSO_OIDC_DEFAULT_REDIRECT_URI"),
+    )
+    sso_provider: str = Field(
+        default="",
+        validation_alias=AliasChoices("sso_provider", "SSO_PROVIDER"),
+    )
+    jwt_issuer: str = Field(
+        default="zqm-void",
+        validation_alias=AliasChoices("jwt_issuer", "JWT_ISSUER"),
+    )
+    jwt_audience: str = Field(
+        default="zqm-void",
+        validation_alias=AliasChoices("jwt_audience", "JWT_AUDIENCE"),
+    )
+    refresh_token_ttl_minutes: int = Field(
+        default=60,
+        validation_alias=AliasChoices("refresh_token_ttl_minutes", "REFRESH_TOKEN_TTL_MINUTES"),
+    )
+
+    # ── SSO / OIDC ─────────────────────────────────────────────────────────────
+    sso_oidc_issuer: str = Field(
+        default="",
+        validation_alias=AliasChoices("sso_oidc_issuer", "SSO_OIDC_ISSUER"),
+    )
+    sso_oidc_client_id: str = Field(
+        default="",
+        validation_alias=AliasChoices("sso_oidc_client_id", "SSO_OIDC_CLIENT_ID"),
+    )
+    sso_oidc_client_secret: str = Field(
+        default="",
+        validation_alias=AliasChoices("sso_oidc_client_secret", "SSO_OIDC_CLIENT_SECRET"),
+    )
+    sso_oidc_metadata_url: str = Field(
+        default="",
+        validation_alias=AliasChoices("sso_oidc_metadata_url", "SSO_OIDC_METADATA_URL"),
+    )
+    sso_oidc_default_redirect_uri: str = Field(
+        default="",
+        validation_alias=AliasChoices("sso_oidc_default_redirect_uri", "SSO_OIDC_DEFAULT_REDIRECT_URI"),
+    )
+    sso_provider: str = Field(
+        default="",
+        validation_alias=AliasChoices("sso_provider", "SSO_PROVIDER"),
+    )
+    jwt_issuer: str = Field(
+        default="zqm-void",
+        validation_alias=AliasChoices("jwt_issuer", "JWT_ISSUER"),
+    )
+    jwt_audience: str = Field(
+        default="zqm-void",
+        validation_alias=AliasChoices("jwt_audience", "JWT_AUDIENCE"),
+    )
+    refresh_token_ttl_minutes: int = Field(
+        default=60,
+        validation_alias=AliasChoices("refresh_token_ttl_minutes", "REFRESH_TOKEN_TTL_MINUTES"),
+    )
+
     # ── GitHub Integration ────────────────────────────────────────────────
     # Target GitHub repository for webhook ingestion and agent actions.
     # Defaults wire to the ZQM-Computing account; override via env if needed.

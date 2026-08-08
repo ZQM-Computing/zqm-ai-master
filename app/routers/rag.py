@@ -7,6 +7,7 @@ End-to-end retrieval-augmented generation over local FLATSPACE memory.
 
 from __future__ import annotations
 
+import asyncio
 import urllib.parse
 from typing import Any, Dict, List, Optional
 
@@ -66,23 +67,27 @@ def _build_context(results: List[Dict[str, Any]]) -> str:
     return "\n\n".join(parts)
 
 
-async def _rerank_results(
-    query: str,
-    results: List[Dict[str, Any]],
-    limit: int = 5,
-) -> List[Dict[str, Any]]:
-    """Stage-2 rerank using bge-m3 embeddings via local Ollama.
-
-    Prefers stored embeddings when available; otherwise falls back to
-    input order so behavior is safe when no embedding backend is present.
-    """
-    if not results:
-        return []
-
-    query_vec = None
+def _embed_text(text: str) -> Optional[List[float]]:
+    if not text:
+        return None
+    backend = os.getenv("RAG_RERANK_EMBEDDING_BACKEND", "ollama").lower()
+    if backend == "chroma" and settings.chroma_enabled:
+        try:
+            from app.services.chroma_service import _chroma_url
+            url = _chroma_url("/api/v1/embeddings")
+            if not url:
+                return None
+            payload = json.dumps({"model": "bge-m3", "prompt": text[:8000]}).encode()
+            req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"}, method="POST")
+            with urllib.request.urlopen(req, timeout=120) as r:
+                emb_data = json.loads(r.read().decode())
+            vec = emb_data.get("embedding")
+            if isinstance(vec, list) and vec:
+                return [float(x) for x in vec]
+        except Exception:
+            return None
     try:
-        import urllib.request, json as _json
-        payload = _json.dumps({"model": "bge-m3", "input": query[:8000]}).encode()
+        payload = json.dumps({"model": "bge-m3", "input": text[:8000]}).encode()
         req = urllib.request.Request(
             f"{(settings.ollama_base_url or 'http://127.0.0.1:11434').rstrip('/')}/api/embed",
             data=payload,
@@ -90,13 +95,32 @@ async def _rerank_results(
             method="POST",
         )
         with urllib.request.urlopen(req, timeout=120) as r:
-            emb_data = _json.loads(r.read().decode())
-        query_vec = emb_data.get("embeddings", [None])[0]
+            emb_data = json.loads(r.read().decode())
+        vec = (emb_data.get("embeddings") or [None])[0]
+        if isinstance(vec, list) and vec:
+            return [float(x) for x in vec]
     except Exception:
-        query_vec = None
+        return None
+    return None
 
+
+async def _rerank_results(
+    query: str,
+    results: List[Dict[str, Any]],
+    limit: int = 5,
+) -> List[Dict[str, Any]]:
+    """Stage-2 rerank using configured embedding backend, with fallback policy."""
+    if not results:
+        return []
+    if not os.getenv("RAG_RERANK_ENABLED", "true").lower() in ("1", "true", "yes"):
+        return results[: max(1, limit)]
+
+    query_vec = _embed_text(query)
     if not query_vec:
-        return results[:limit]
+        fallback = os.getenv("RAG_RERANK_FALLBACK", "preserve_order").lower()
+        if fallback == "none":
+            return []
+        return results[: max(1, limit)]
 
     def _cosine(a, b):
         if not a or not b or len(a) != len(b):
@@ -108,14 +132,151 @@ async def _rerank_results(
             return None
         return dot / (na * nb)
 
-    scored = []
+    scored: List[Tuple[float, Dict[str, Any]]] = []
+    provenance: Dict[str, Any] = {"backend": os.getenv("RAG_RERANK_EMBEDDING_BACKEND", "ollama"), "query_chars": len(query)}
     for item in results:
-        vec = item.get("embedding")
+        vec_raw = item.get("embedding")
+        vec = [float(x) for x in vec_raw] if isinstance(vec_raw, list) else None
+        if not vec:
+            vec = _embed_text(str(item.get("value") or item.get("text") or item.get("output") or ""))
         score = _cosine(query_vec, vec)
-        scored.append((score, item))
-    scored = [(s, it) for s, it in scored if s is not None] or [(0.0, it) for _, it in scored]
+        scored.append((score if score is not None else -1.0, item))
+    provenance["scored_items"] = len(scored)
     scored.sort(key=lambda x: x[0], reverse=True)
-    return [it for _, it in scored[:limit]]
+    out = [it for _, it in scored[: max(1, limit)]]
+    for it in out:
+        it.setdefault("rerank", provenance)
+    return out
+
+
+@router.post("/search")
+async def hybrid_search(
+    request: Request,
+    body: Dict[str, Any],
+    auth: Dict[str, Any] = Depends(get_current_token_payload),
+) -> JSONResponse:
+    """Hybrid RAG search: Meilisearch full-text + Chroma vector, reranked by bge-m3."""
+    orch = getattr(request.app.state, "orchestrator", None)
+    if orch is None:
+        return JSONResponse({"error": "orchestrator not ready"}, status_code=503)
+
+    query_text = (body.get("query") or "").strip()
+    if not query_text:
+        return JSONResponse(
+            ZQM_AIResponse.ok(data={"sources": []}, message="missing query").model_dump(mode="json")
+        )
+    try:
+        limit = int(body.get("limit", 5))
+    except Exception:
+        limit = 5
+    tier = body.get("tier")
+    if tier is not None:
+        tier = str(tier).strip() or None
+
+    # Build parallel retrieval tasks.
+    meili_limit = max(limit * 2, 20)
+    chroma_limit = max(limit * 2, 20)
+
+    async def _meili():
+        hits = []
+        try:
+            from app.services.meilisearch_service import search as meili_search
+            hits = meili_search(settings.meilisearch_default_index, query_text, meili_limit)
+        except Exception as exc:
+            log.debug("Hybrid RAG Meilisearch failed", error=str(exc))
+        return hits
+
+    async def _chroma():
+        hits = []
+        try:
+            if settings.chroma_enabled:
+                from app.services.chroma_service import search as chroma_search
+                hits = chroma_search(query_text, collection=settings.chroma_collection, limit=chroma_limit)
+        except Exception as exc:
+            log.debug("Hybrid RAG Chroma failed", error=str(exc))
+        return hits
+
+    meili_hits, chroma_hits = await asyncio.gather(_meili(), _chroma())
+
+    merged: Dict[str, Dict[str, Any]] = {}
+
+    def _ingest(hit: Dict[str, Any], score_source: str) -> None:
+        key = hit.get("key")
+        if not key:
+            return
+        raw = hit.get("value") or hit.get("text") or hit.get("output") or ""
+        text = raw if isinstance(raw, str) else json.dumps(raw, default=str)
+        entry = merged.setdefault(
+            str(key),
+            {
+                "key": str(key),
+                "text": text,
+                "score": 0.0,
+                "tier": hit.get("tier") or (tier or "flatspace"),
+            },
+        )
+        if score_source == "meili":
+            score = hit.get("score")
+            if isinstance(score, (int, float)):
+                entry["score"] += float(score)
+                if not entry.get("tier"):
+                    entry["tier"] = hit.get("tier") or "flatspace"
+        elif score_source == "chroma":
+            score = hit.get("score")
+            if isinstance(score, (int, float)):
+                entry["score"] += float(score)
+            chroma_tier = hit.get("tier")
+            if chroma_tier:
+                entry["tier"] = chroma_tier
+
+    for hit in meili_hits:
+        _ingest(hit, "meili")
+    for hit in chroma_hits:
+        _ingest(hit, "chroma")
+
+    merged_items = list(merged.values())
+    merged_items.sort(key=lambda x: x.get("score", 0.0), reverse=True)
+    candidates = merged_items[: max(limit * 2, 1)]
+
+    # Fallback to rerank path: preserve embedding key names expected by _rerank_results.
+    reranked = []
+    try:
+        prepared = []
+        for item in candidates:
+            prepared.append(
+                {
+                    "key": item.get("key"),
+                    "value": item.get("text"),
+                    "text": item.get("text"),
+                    "score": item.get("score"),
+                    "tier": item.get("tier"),
+                }
+            )
+        reranked = await _rerank_results(query_text, prepared, limit=max(1, limit))
+    except Exception as exc:
+        log.debug("Hybrid RAG rerank skipped", error=str(exc))
+        reranked = candidates[: max(1, limit)]
+
+    sources = []
+    for r in reranked[: max(1, limit)]:
+        text = r.get("text") or r.get("value") or ""
+        if not isinstance(text, str):
+            text = json.dumps(text, default=str)
+        sources.append(
+            {
+                "key": r.get("key"),
+                "text": text[:4000],
+                "score": r.get("score"),
+                "tier": r.get("tier") or (tier or "flatspace"),
+            }
+        )
+
+    return JSONResponse(
+        ZQM_AIResponse.ok(
+            data={"sources": sources, "count": len(sources)},
+            message=f"Hybrid RAG search complete: {len(sources)} sources",
+        ).model_dump(mode="json")
+    )
 
 
 @router.get("/diag")
