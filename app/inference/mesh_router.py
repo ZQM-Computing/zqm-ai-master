@@ -52,18 +52,27 @@ def resolve_node_ip(node_id: str, fallback: str) -> str:
 
 
 async def discover_mesh_nodes() -> List[Dict[str, Any]]:
-    """Discover live mesh nodes via /healthz."""
+    """Discover live mesh nodes via /healthz with basic latency scoring."""
     import urllib.request
-    live = []
+    scored: List[Dict[str, Any]] = []
     for node in MESH_NODES:
         try:
+            t0 = __import__("time").monotonic()
             req = urllib.request.Request(f"http://{node['ip']}:{node['port']}/healthz", method="GET")
             with urllib.request.urlopen(req, timeout=5) as r:
                 if r.status == 200:
-                    live.append(node)
+                    latency_ms = (__import__("time").monotonic() - t0) * 1000
+                    scored.append({
+                        "id": node["id"],
+                        "ip": node["ip"],
+                        "port": node["port"],
+                        "latency_ms": round(latency_ms, 2),
+                        "healthy": True,
+                    })
         except Exception:
             pass
-    return live
+    scored.sort(key=lambda n: n.get("latency_ms") or float("inf"))
+    return scored
 
 
 def estimate_model_vram_gb(model_params_b: float, quant: str = "fp16") -> float:
@@ -72,13 +81,16 @@ def estimate_model_vram_gb(model_params_b: float, quant: str = "fp16") -> float:
 
 
 def route_inference(model_params_b: float, quant: str = "fp16") -> Optional[Dict[str, Any]]:
-    """Route inference to best available node."""
+    """Route inference to the healthiest/lowest-latency available node."""
+    try:
+        live = __import__("asyncio").get_event_loop().run_until_complete(discover_mesh_nodes())
+    except Exception:
+        live = []
+    if not live:
+        return None
     needed_vram = estimate_model_vram_gb(model_params_b, quant)
-    # Placeholder: real routing checks node GPU memory/load
-    for node in MESH_NODES:
-        # Simplified: assume all nodes can handle small models
-        return node
-    return None
+    # TODO: compare needed_vram against reported node memory/GPU metrics
+    return live[0]
 
 
 async def distributed_chat(node: Dict[str, Any], model: str, messages: List[Dict[str, str]], timeout: int = 120) -> Dict[str, Any]:

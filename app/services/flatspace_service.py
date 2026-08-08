@@ -315,6 +315,15 @@ class FlatSpaceService:
         except Exception:
             pass
 
+        # Chroma vector fallback when enabled.
+        try:
+            from app.services.chroma_service import search as chroma_search
+            chroma_hits = chroma_search(query, limit=limit)
+            if chroma_hits:
+                return chroma_hits[:limit]
+        except Exception:
+            pass
+
         base = settings.flatspace_endpoint.rsplit("/store", 1)[0]
         if FLATSPACE_MODE != "remote" and self._remote_known_down:
             return self._local.search(query, tier, limit)

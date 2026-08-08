@@ -183,6 +183,20 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("meilisearch_default_index", "MEILISEARCH_DEFAULT_INDEX"),
     )
 
+    # ── Chroma Vector Store ───────────────────────────────────────────────────
+    chroma_url: str = Field(
+        default="http://127.0.0.1:8001",
+        validation_alias=AliasChoices("chroma_url", "CHROMA_URL", "CHROMA_HOST"),
+    )
+    chroma_collection: str = Field(
+        default="flatspace",
+        validation_alias=AliasChoices("chroma_collection", "CHROMA_COLLECTION"),
+    )
+    chroma_enabled: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("chroma_enabled", "CHROMA_ENABLED"),
+    )
+
     # ── ZQM Network ───────────────────────────────────────────────────────────
     network_endpoint: str = "http://192.168.1.228:8808/api/network"
 

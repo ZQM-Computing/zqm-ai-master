@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import uuid
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -42,6 +42,8 @@ class UserRecord(BaseModel):
     active: bool = True
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     hashed_password: str = ""
+    failed_attempts: int = 0
+    locked_until: Optional[datetime] = None
 
 
 _users: Dict[str, UserRecord] = {}
@@ -68,9 +70,17 @@ class TokenResponse(BaseModel):
     user_id: str
     username: str
     roles: List[str]
+    refresh_token: Optional[str] = None
 
 
-# ── Endpoints ──────────────────────────────────────────────────────────────────
+# ── Auth hardening constants ───────────────────────────────────────────────────
+
+MAX_FAILED_ATTEMPTS = int(os.getenv("ZQM_MAX_FAILED_ATTEMPTS", "5"))
+LOCKOUT_MINUTES = int(os.getenv("ZQM_LOCKOUT_MINUTES", "15"))
+REFRESH_TOKEN_TTL_MINUTES = int(os.getenv("ZQM_REFRESH_TOKEN_TTL_MINUTES", "60"))
+
+
+
 
 @router.post(
     "/login",
@@ -90,11 +100,30 @@ async def login(credentials: UserLogin) -> ZQM_AIResponse:
 
     user = next((u for u in _users.values() if u.username == credentials.username), None)
 
-    if not user or not verify_password(credentials.password, user.hashed_password):
+    if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password",
         )
+
+    now = datetime.now(timezone.utc)
+    if getattr(user, "locked_until", None) and now < user.locked_until:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account locked due to repeated failed attempts",
+        )
+
+    if not verify_password(credentials.password, user.hashed_password):
+        user.failed_attempts = getattr(user, "failed_attempts", 0) + 1
+        if user.failed_attempts >= MAX_FAILED_ATTEMPTS:
+            user.locked_until = now + timedelta(minutes=LOCKOUT_MINUTES)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password",
+        )
+
+    user.failed_attempts = 0
+    user.locked_until = None
 
     if not user.active:
         raise HTTPException(
@@ -109,6 +138,15 @@ async def login(credentials: UserLogin) -> ZQM_AIResponse:
             "roles": user.roles,
         }
     )
+    refresh_token = create_access_token(
+        subject={
+            "sub": user.user_id,
+            "type": "refresh",
+            "username": user.username,
+            "roles": user.roles,
+        },
+        expires_delta=timedelta(minutes=REFRESH_TOKEN_TTL_MINUTES),
+    )
 
     from app.core.config import settings
     result = TokenResponse(
@@ -117,6 +155,7 @@ async def login(credentials: UserLogin) -> ZQM_AIResponse:
         user_id=user.user_id,
         username=user.username,
         roles=user.roles,
+        refresh_token=refresh_token,
     )
     log.info("LOGIN_OK", user=user.username, token_len=len(token))
     return ZQM_AIResponse.ok(

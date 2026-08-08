@@ -66,6 +66,58 @@ def _build_context(results: List[Dict[str, Any]]) -> str:
     return "\n\n".join(parts)
 
 
+async def _rerank_results(
+    query: str,
+    results: List[Dict[str, Any]],
+    limit: int = 5,
+) -> List[Dict[str, Any]]:
+    """Stage-2 rerank using bge-m3 embeddings via local Ollama.
+
+    Prefers stored embeddings when available; otherwise falls back to
+    input order so behavior is safe when no embedding backend is present.
+    """
+    if not results:
+        return []
+
+    query_vec = None
+    try:
+        import urllib.request, json as _json
+        payload = _json.dumps({"model": "bge-m3", "input": query[:8000]}).encode()
+        req = urllib.request.Request(
+            f"{(settings.ollama_base_url or 'http://127.0.0.1:11434').rstrip('/')}/api/embed",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=120) as r:
+            emb_data = _json.loads(r.read().decode())
+        query_vec = emb_data.get("embeddings", [None])[0]
+    except Exception:
+        query_vec = None
+
+    if not query_vec:
+        return results[:limit]
+
+    def _cosine(a, b):
+        if not a or not b or len(a) != len(b):
+            return None
+        dot = sum(x * y for x, y in zip(a, b))
+        na = sum(x * x for x in a) ** 0.5
+        nb = sum(y * y for y in b) ** 0.5
+        if na == 0 or nb == 0:
+            return None
+        return dot / (na * nb)
+
+    scored = []
+    for item in results:
+        vec = item.get("embedding")
+        score = _cosine(query_vec, vec)
+        scored.append((score, item))
+    scored = [(s, it) for s, it in scored if s is not None] or [(0.0, it) for _, it in scored]
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [it for _, it in scored[:limit]]
+
+
 @router.get("/diag")
 async def diag(
     request: Request,
@@ -167,6 +219,20 @@ async def query(
     sources = [
         {"key": r.get("key"), "score": r.get("score"), "tier": r.get("tier")}
         for r in results
+    ]
+
+    # Optional rerank stage using configured reranker backend.
+    reranked: List[Dict[str, Any]] = []
+    try:
+        reranked = await _rerank_results(query_text, results, limit=max(1, limit))
+    except Exception as exc:
+        log.debug("RAG rerank skipped", error=str(exc))
+    effective_results = reranked if reranked else results
+
+    context = _build_context(effective_results)
+    sources = [
+        {"key": r.get("key"), "score": r.get("score"), "tier": r.get("tier")}
+        for r in effective_results
     ]
 
     # Optional web augmentation via SearXNG
