@@ -68,11 +68,11 @@ def _https_json_get(url: str, timeout: float = 4.0) -> Optional[Dict[str, Any]]:
     return None
 
 
-def _local_api(base_path: str = "http://127.0.0.1:8810") -> Optional[Dict[str, Any]]:
+def _local_api(base_path: str = "http://127.0.0.1:8808") -> Optional[Dict[str, Any]]:
     return _json_get(f"{base_path}/api/healthz", timeout=6.0)
 
 
-def _garden_evidence(base_path: str = "http://127.0.0.1:8810") -> List[str]:
+def _garden_evidence(base_path: str = "http://127.0.0.1:8808") -> List[str]:
     out: List[str] = []
     data = _json_get(f"{base_path}/api/garden/health", timeout=6.0)
     if data is None:
@@ -82,7 +82,7 @@ def _garden_evidence(base_path: str = "http://127.0.0.1:8810") -> List[str]:
     return out
 
 
-def _mesh_evidence(base_path: str = "http://127.0.0.1:8810") -> List[str]:
+def _mesh_evidence(base_path: str = "http://127.0.0.1:8808") -> List[str]:
     out: List[str] = []
     data = _json_get(f"{base_path}/api/mesh/nodes/health", timeout=6.0)
     if data is None:
@@ -95,7 +95,7 @@ def _mesh_evidence(base_path: str = "http://127.0.0.1:8810") -> List[str]:
     return out
 
 
-def _status_code_evidence(base_path: str = "http://127.0.0.1:8810") -> List[str]:
+def _status_code_evidence(base_path: str = "http://127.0.0.1:8808") -> List[str]:
     out: List[str] = []
     for path in ["/api/status", "/api/garden/metrics"]:
         url = f"{base_path}{path}"
@@ -126,7 +126,7 @@ def _codebase_evidence() -> List[str]:
     return out
 
 
-def gather_council_evidence(base_path: str = "http://127.0.0.1:8810") -> List[str]:
+def gather_council_evidence(base_path: str = "http://127.0.0.1:8808") -> List[str]:
     parts: List[str] = []
     try:
         parts.append("Live system evidence:")
