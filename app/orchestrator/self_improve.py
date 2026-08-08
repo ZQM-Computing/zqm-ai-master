@@ -68,36 +68,6 @@ KNOWN_PATCHES: List[Dict[str, str]] = [
         ),
         "why": "Import the canonical build version so the envelope reports truth instead of a hardcoded string.",
     },
-    {
-        "id": "env-version-zqm-response",
-        "file": "app/models/response.py",
-        "old": '    duration_ms: Optional[int] = None\n    version: str = "2.0.0"\n',
-        "new": '    duration_ms: Optional[int] = None\n    version: str = _VOID_VERSION\n',
-        "why": "ZQM_AIResponse envelope version was hardcoded 2.0.0; now tracks the real build version.",
-    },
-    {
-        "id": "env-version-healthstatus",
-        "file": "app/models/response.py",
-        "old": '    zqm_ai_id: str = "ZQM-ZQM_AI-004"\n    version: str = "2.0.0"\n',
-        "new": '    zqm_ai_id: str = "ZQM-ZQM_AI-004"\n    version: str = _VOID_VERSION\n',
-        "why": "HealthStatus envelope version was hardcoded 2.0.0; now tracks the real build version.",
-    },
-    {
-        "id": "env-version-docstring",
-        "file": "app/models/response.py",
-        "old": 'Version: 2.0.0 | ZQM Computing LLC\n',
-        "new": 'Version: 2.1.2 | ZQM Computing LLC\n',
-        "why": "Module docstring version drift (cosmetic, kept in sync with build).",
-    },
-    {
-        "id": "health-env-authoritative",
-        "file": "app/orchestrator/zqm_ai_orchestrator.py",
-        "old": '            environment=settings.environment,\n',
-        "new": '            environment=os.getenv("ENVIRONMENT", settings.environment),\n',
-        "why": "Health 'environment' now reads the live ENVIRONMENT process var (truthful even "
-               "when pydantic-settings does not pick up .env). Fixes replicas reporting "
-               "'development' despite ENVIRONMENT=production in their launcher.",
-    },
 ]
 
 

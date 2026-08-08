@@ -193,3 +193,45 @@ async def council_quality(
             message=f"Council quality review: {quality.get('sessions')} sessions",
         ).model_dump(mode="json")
     )
+
+
+@router.get("/evidence")
+async def council_evidence(
+    request: Request,
+    auth: Dict[str, Any] = Depends(get_current_token_payload),
+) -> JSONResponse:
+    orch = getattr(request.app.state, "orchestrator", None)
+    if orch is None or not hasattr(orch, "_void_council"):
+        return JSONResponse({"error": "council not available"}, status_code=503)
+    try:
+        from app.orchestrator.void_council import gather_council_evidence
+        evidence = gather_council_evidence()
+    except Exception as exc:
+        return JSONResponse({"success": False, "error": "evidence_gather_failed", "detail": str(exc)}, status_code=500)
+    return JSONResponse(
+        ZQM_AIResponse.ok(
+            data={"evidence": evidence},
+            message=f"{len(evidence)} evidence line(s)",
+        ).model_dump(mode="json")
+    )
+
+
+@router.get("/sessions")
+async def council_sessions(
+    request: Request,
+    limit: int = 20,
+    auth: Dict[str, Any] = Depends(get_current_token_payload),
+) -> JSONResponse:
+    orch = getattr(request.app.state, "orchestrator", None)
+    if orch is None or not hasattr(orch, "_void_council"):
+        return JSONResponse({"error": "council not available"}, status_code=503)
+    try:
+        rows = await orch._void_council.review_history(limit=min(limit, 200))
+    except Exception as exc:
+        return JSONResponse({"success": False, "error": "sessions_read_failed", "detail": str(exc)}, status_code=500)
+    return JSONResponse(
+        ZQM_AIResponse.ok(
+            data={"sessions": rows, "count": len(rows)},
+            message=f"{len(rows)} council session(s)",
+        ).model_dump(mode="json")
+    )
