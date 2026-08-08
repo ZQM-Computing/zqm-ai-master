@@ -42,6 +42,12 @@ The Void AI Orchestration System — local-first RAG, reasoning, mesh ops, and c
 
 This repo integrates with `zqm-intel-platforms` for shared OSINT/CTI/SIEM/Windows-telemetry primitives.
 
+- Evidence ingestion: council findings can be mirrored into flatspace/observability/garden/redis via `initialize_integrations()`.
+- Telemetry routing: observability events, council session summaries, and mesh metrics are pushed to the intel platform through optional service hooks in `app/orchestrator/void_council.py`.
+- Operational handoff: `scripts/verify_falsification_integration.py` validates cross-system consistency between Void outputs and intel platform expectations.
+
+See `docs/VOID_INTEGRATION.md` for wiring and verification.
+
 ## License
 
 MIT unless otherwise noted in submodules.
