@@ -1,0 +1,6 @@
+# Default owner for all files
+* @zqmco
+
+# Specific ownership patterns (customize per repo as needed)
+# /docs/ @zqmco
+# /src/ @zqmco
