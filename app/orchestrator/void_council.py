@@ -392,6 +392,33 @@ class VoidCouncil:
             except Exception:
                 pass
 
+    def _mounted_route_summary(self) -> str:
+        app = getattr(self, "_app", None)
+        if app is None:
+            return (
+                "process, status, info, garden, flatspace, mesh_ops, "
+                "quantum_llm_bridge, void_council"
+            )
+        try:
+            routes = []
+            for route in getattr(app, "routes", []):
+                prefix = ""
+                if hasattr(route, "prefix") and route.prefix:
+                    prefix = f"{route.prefix}/"
+                path = getattr(route, "path", "") or ""
+                if prefix or path:
+                    routes.append(f"{prefix}{path}".rstrip("/"))
+            seen = []
+            for item in routes:
+                if item and item not in seen:
+                    seen.append(item)
+            return ", ".join(seen[:24])
+        except Exception:
+            return (
+                "process, status, info, garden, flatspace, mesh_ops, "
+                "quantum_llm_bridge, void_council"
+            )
+
     def next_domain(self) -> str:
         self._idx += 1
         return self.current_domain
@@ -416,13 +443,12 @@ class VoidCouncil:
         evidence: list[str] | None = None,
     ) -> str:
         evidence_block = ""
-        evidence_block = ""
         if evidence:
             evidence_block = "\n".join(evidence) + "\n\n"
         live_context = (
             "Live system evidence:\n"
-            f"- Stack is FastAPI + Uvicorn on Windows/NSSM; routers include process, status, info, garden, flatspace, mesh_ops, quantum_llm_bridge, void_council; build {getattr(getattr(self, 'settings', None), 'app_version', 'unknown')}.\n"
-            "- Recent changes: MeshNodeOperations wiring, mesh_ops router, resilient garden_service, garden node IP refresh.\n\n"
+            f"- Build: {getattr(getattr(self, 'settings', None), 'app_version', 'unknown')}\n"
+            f"- Mounted routes: {self._mounted_route_summary()}\n\n"
         )
         base = (
             f"VOID COUNCIL — {domain.upper()} DOMAIN REVIEW\n"
