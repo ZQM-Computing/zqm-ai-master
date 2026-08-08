@@ -13,6 +13,19 @@ router = APIRouter(prefix="/api/void-council", tags=["Void Council"])
 log = get_logger("router.void-council")
 
 
+@router.get("/status")
+async def council_status() -> JSONResponse:
+    return JSONResponse(
+        {
+            "ok": True,
+            "service": "void_council",
+            "available": True,
+            "session_count": 0,
+            "message": "status endpoint available",
+        }
+    )
+
+
 @router.get("/domains")
 async def list_domains(
     auth: dict[str, Any] = Depends(get_current_token_payload),

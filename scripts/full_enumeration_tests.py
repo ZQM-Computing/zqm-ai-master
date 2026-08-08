@@ -13,8 +13,16 @@ from typing import Any
 import requests
 
 BASE = "http://127.0.0.1:8808"
-REPO = Path(r"C:\Void\ZQM-AI-Master")
-PY = r"C:\Program Files\Python312\python.exe"
+REPO = Path(__file__).resolve().parent.parent
+_PY_DEFAULT = r"C:\Program Files\Python312\python.exe"
+
+
+def _resolve_py() -> str:
+    import shutil
+    return _PY_DEFAULT if Path(_PY_DEFAULT).exists() else (shutil.which("python") or shutil.which("python3") or "python")
+
+
+PY = _resolve_py()
 
 # Endpoints that are POST-only
 POST_ONLY = {
@@ -75,19 +83,18 @@ class TestSuite:
             self._record("dist_artifacts_count", len(artifacts) > 0, f"count={len(artifacts)}")
 
     def test_service_state(self) -> None:
-        try:
-            r = requests.get(f"{BASE}/healthz", timeout=2)
-            r.raise_for_status()
-        except Exception:
-            self._record("service_healthz", False, "skipped: service not running")
-            self._record("service_api_healthz", False, "skipped: service not running")
-            self._record("service_version", False, "skipped: service not running")
-            return
-        self._record("service_healthz", r.status_code == 200, f"status={r.status_code}")
-        r = requests.get(f"{BASE}/api/healthz", timeout=5)
-        self._record("service_api_healthz", r.status_code == 200, f"status={r.status_code}")
-        r = requests.get(f"{BASE}/api/version", timeout=5)
-        self._record("service_version", r.status_code == 200, f"status={r.status_code}")
+        checks = [
+            "/healthz",
+            "/api/healthz",
+            "/api/version",
+            "/api/void-council/status",
+        ]
+        for path in checks:
+            try:
+                r = requests.get(f"{BASE}{path}", timeout=2)
+                self._record(f"service_{path}", r.status_code == 200, f"status={r.status_code}")
+            except Exception:
+                self._record(f"service_{path}", False, "skipped: service not running")
 
     def test_openapi_enumeration(self) -> None:
         try:
@@ -98,9 +105,10 @@ class TestSuite:
             return
         if r.status_code == 200:
             data = r.json()
-            paths = list(data.get("paths", {}).keys())
+            paths = sorted(data.get("paths", {}).keys())
             self._record("openapi_path_count", len(paths) > 0, f"count={len(paths)}")
-            self._record("support_route_in_schema", "/api/support/status" in paths, f"paths={paths[:5]}...")
+            for required in ["/api/void-council/status", "/api/version", "/api/void/talk", "/api/users/login"]:
+                self._record(f"schema_has_{required.strip('/').replace('/', '_')}", required in paths, f"present={required in paths}")
 
     def test_public_endpoints(self) -> None:
         public = ["/healthz", "/api/healthz", "/api/version", "/docs", "/redoc", "/openapi.json"]
