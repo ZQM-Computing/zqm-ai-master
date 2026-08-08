@@ -16,6 +16,8 @@ jobs:
           python-version: '3.12'
       - run: pip install -r requirements.txt
       - run: python -m py_compile app/**/*.py
+      - name: Run unit tests
+        run: python -m pytest tests/ -v
       - name: Run integration tests
         continue-on-error: true
         run: |
