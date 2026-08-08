@@ -8,7 +8,6 @@
 
 The Void AI Orchestration System — local-first RAG, reasoning, mesh ops, and commercial packaging.
 
-
 `zqm-ai-master` holds the canonical scripts, verification tests, and orchestration entry points for ZQM AI/ML workflows. It includes LoRA training probes, falsification protocol verifiers, MeiliSync remediation, RAG bootstrap, Windows service installers, and capacity probes — all oriented toward running on ZQM Windows workstations.
 
 ## Contents
@@ -51,3 +50,27 @@ MIT unless otherwise noted in submodules.
 
 Alex Zelenski — zqmcomputing@gmail.com
 Brand: ZQM Computing / ZQM-Labs
+
+
+## CLI
+
+Installed entrypoint:
+```bash
+zqm-ai-master --help
+```
+
+Subcommands:
+```bash
+zqm-ai-master serve --host 127.0.0.1 --port 8808 --reload
+zqm-ai-master health --host 127.0.0.1 --port 8808
+zqm-ai-master status --host 127.0.0.1 --port 8808
+zqm-ai-master info --host 127.0.0.1 --port 8808
+zqm-ai-master agents --host 127.0.0.1 --port 8808
+zqm-ai-master routes --host 127.0.0.1 --port 8808
+zqm-ai-master routes --offline
+zqm-ai-master config --host 127.0.0.1 --port 8808
+zqm-ai-master logs --tail 100
+zqm-ai-master logs --follow
+zqm-ai-master test
+zqm-ai-master version
+```

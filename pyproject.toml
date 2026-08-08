@@ -40,3 +40,6 @@ ignore = ["Python", "pythoncore-3.14-64", "samples", "data"]
 [project.urls]
 Homepage = "https://github.com/ZQM-Labs/zqm-ai-master"
 Repository = "https://github.com/ZQM-Labs/zqm-ai-master.git"
+
+[project.scripts]
+zqm-ai-master = "cli:main"
