@@ -114,6 +114,8 @@ def decode_token(token: str) -> Dict[str, Any]:
             token,
             settings.secret_key,
             algorithms=[settings.algorithm],
+            audience=settings.jwt_audience,
+            issuer=settings.jwt_issuer,
         )
         return payload
     except JWTError as exc:

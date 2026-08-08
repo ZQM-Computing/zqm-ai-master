@@ -19,6 +19,8 @@ if [[ -z "$PUBKEY_CONTENT" ]]; then
   exit 1
 fi
 
+SSH_OPTS="-o BatchMode=yes -o ConnectTimeout=5 -i $HOME/.ssh/zqm_mesh_ed25519_hardened"
+
 pass() { echo "OK: $*"; }
 fail() { echo "FAIL: $*" >&2; exit 1; }
 
@@ -30,16 +32,16 @@ for entry in "${NODES[@]}"; do
   echo "== $NODE ($IP) =="
 
   # 1) liveness/ssh reachability
-  if ! ssh -o BatchMode=yes -o ConnectTimeout=5 "$REMOTE" "echo reachable" >/dev/null 2>&1; then
+  if ! ssh $SSH_OPTS "$REMOTE" "echo reachable" >/dev/null 2>&1; then
     fail "$NODE ssh not reachable"
   fi
   pass "$NODE ssh reachable"
 
   # 2) ensure .ssh dir exists and is 700
-  ssh -o BatchMode=yes "$REMOTE" 'mkdir -p ~/.ssh && chmod 700 ~/.ssh'
+  ssh $SSH_OPTS "$REMOTE" 'mkdir -p ~/.ssh && chmod 700 ~/.ssh'
 
   # 3) append the hardened pubkey if missing (idempotent)
-  ssh -o BatchMode=yes "$REMOTE" "
+  ssh $SSH_OPTS "$REMOTE" "
     if ! grep -Fxq '${PUBKEY_CONTENT}' ~/.ssh/authorized_keys 2>/dev/null; then
       printf '%s\n' '${PUBKEY_CONTENT}' >> ~/.ssh/authorized_keys
     fi
@@ -48,7 +50,7 @@ for entry in "${NODES[@]}"; do
   pass "$NODE authorized_keys updated"
 
   # 4) validate forced-key auth still rejects password auth
-  if ssh -o BatchMode=yes -o PubkeyAuthentication=yes -o PasswordAuthentication=no "$REMOTE" "echo key-auth-ok"; then
+  if ssh $SSH_OPTS -o PubkeyAuthentication=yes -o PasswordAuthentication=no "$REMOTE" "echo key-auth-ok"; then
     pass "$NODE password auth still accepted; harden further if required"
   else
     fail "$NODE key auth validation failed"
