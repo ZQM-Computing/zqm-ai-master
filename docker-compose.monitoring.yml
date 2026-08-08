@@ -1,8 +1,7 @@
-version: "3.8"
 
 services:
   node-exporter:
-    image: prom/node-exporter:v1.8
+    image: prom/node-exporter:latest
     container_name: zqm-node-exporter
     restart: "no"
     pid: host
@@ -19,7 +18,7 @@ services:
       - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
 
   cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.47
+    image: gcr.io/cadvisor/cadvisor:v0.47.1
     container_name: zqm-cadvisor
     restart: "no"
     ports: ["8082:8080"]
@@ -31,7 +30,7 @@ services:
       - /dev/disk/:/dev/disk:ro
 
   prometheus:
-    image: prom/prometheus:v2.47
+    image: prom/prometheus:latest
     container_name: zqm-prometheus
     restart: "no"
     ports: ["9091:9090"]
@@ -54,17 +53,17 @@ services:
       start_period: 20s
 
   grafana:
-    image: grafana/grafana:10.2
+    image: grafana/grafana:latest
     container_name: zqm-grafana
     restart: "no"
-    ports: ["3001:3000"]
+    ports: ["3002:3000"]
     volumes:
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       - grafana-storage:/var/lib/grafana
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-zqm_void_admin}
       - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s:3001/monitoring
+      - GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s:3002/grafana
       - GF_SERVER_SERVE_FROM_SUB_PATH=true
     depends_on:
       prometheus:
