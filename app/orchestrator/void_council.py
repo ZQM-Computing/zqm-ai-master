@@ -879,7 +879,7 @@ class VoidCouncil:
             "session": self._session_count,
             "total_sessions": self._session_count,
             "total_applied": self._applied_count + applied,
-            "integration_evidence": integration_evidence if 'integration_evidence' in dir() else {"error": "integration_block_skipped"},
+            "integration_evidence": integration_evidence,
         }
 
     async def convene_full(
@@ -957,7 +957,7 @@ class VoidCouncil:
         domains: list[str],
         *,
         min_confidence: float = 0.7,
-        auto_apply: bool = True,
+        auto_apply: bool = False,
     ) -> dict[str, Any]:
         """Emergency cross-domain session for critical issues."""
         valid = [d for d in domains if d in COUNCIL_DOMAINS]

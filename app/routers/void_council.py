@@ -164,7 +164,7 @@ async def emergency_council(
         result = await orch._void_council.convene_emergency(
             domains=domains,
             min_confidence=float(body.get("min_confidence", 0.7)),
-            auto_apply=bool(body.get("auto_apply", True)),
+            auto_apply=bool(body.get("auto_apply", False)),
         )
     except Exception as exc:
         log.exception("Void Council emergency session failed", error=str(exc))
