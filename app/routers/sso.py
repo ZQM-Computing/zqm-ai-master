@@ -146,3 +146,15 @@ async def sso_me(auth: Dict[str, Any] = Depends(get_current_token_payload)) -> J
         "service": auth.get("service"),
         "auth_source": auth.get("type", "local"),
     })
+
+
+# Backward-compatible alias: /api/sso/status -> /api/auth/sso/status
+_alias = APIRouter(tags=["SSO"])
+
+
+@_alias.get("/status")
+async def sso_status_alias(auth: Dict[str, Any] = Depends(get_current_token_payload)) -> JSONResponse:
+    return await router.routes[0].endpoint(auth=auth)
+
+
+router.include_router(_alias)

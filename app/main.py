@@ -940,6 +940,8 @@ from app.routers.train import router as train_router
 app.include_router(train_router)
 from app.routers.support import router as support_router
 app.include_router(support_router)
+from app.routers.billing import router as billing_router
+app.include_router(billing_router)
 
 
 # ── Dev server entry point ────────────────────────────────────────────────────
