@@ -16,7 +16,7 @@ jobs:
       - run: python scripts/build_release.py
       - name: Build Windows service package
         run: powershell -File scripts/install_service.ps1 -InstallDir dist\install
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-dist
           path: |
