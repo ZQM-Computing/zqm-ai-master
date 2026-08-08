@@ -24,7 +24,8 @@ from app.core.config import settings
 DB_PATH = "app/flatspace_local.db"
 COLLECTION_ID = "477b326c-f754-454f-8842-dd4247a4630a"
 COLLECTION_PATH = f"/api/v2/tenants/default_tenant/databases/default_database/collections/{COLLECTION_ID}"
-BATCH = 100
+BATCH = 20
+MAX_RETRIES = 3
 EMBED_MODEL = "bge-m3:latest"
 EMBED_URL = "http://127.0.0.1:11434/api/embeddings"
 
@@ -179,14 +180,22 @@ def main() -> int:
     docs = docs_from_db()
     print("docs_from_db", len(docs))
     t0 = time.time()
+    failed = []
     for i in range(0, len(docs), BATCH):
         batch = docs[i:i + BATCH]
-        try:
-            _upsert_batch(batch)
-        except Exception as exc:
-            print("upsert_failed", i, exc)
-            continue
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                _upsert_batch(batch)
+                break
+            except Exception as exc:
+                print(f"upsert_failed {i} attempt {attempt} {exc}")
+                if attempt >= MAX_RETRIES:
+                    failed.append(i)
+                    break
+                time.sleep(2**attempt)
         print("upserted", min(i + BATCH, len(docs)), "elapsed", round(time.time() - t0, 1))
+    if failed:
+        print("failed_batches", failed)
     print("DONE elapsed", round(time.time() - t0, 1))
     return 0
 
