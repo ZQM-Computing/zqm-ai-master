@@ -179,6 +179,8 @@ async def get_me(
         return ZQM_AIResponse.ok(
             data={
                 "user_id": user.user_id,
+                "sub": user.user_id,
+                "type": "local",
                 "username": user.username,
                 "email": user.email,
                 "roles": user.roles,
@@ -189,7 +191,7 @@ async def get_me(
         )
     # Service token
     return ZQM_AIResponse.ok(
-        data={"sub": auth.get("sub"), "type": auth.get("type", "user"), "roles": auth.get("roles", [])},
+        data={"sub": auth.get("sub"), "type": auth.get("type", "user"), "roles": auth.get("roles", []), "service": auth.get("service")},
         message="Service token",
     )
 

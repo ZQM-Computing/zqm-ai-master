@@ -133,11 +133,16 @@ async def sso_login(request: Request) -> JSONResponse:
 @router.get("/me")
 async def sso_me(auth: Dict[str, Any] = Depends(get_current_token_payload)) -> JSONResponse:
     """Return current user identity, normalizing SSO and local tokens."""
+    user_id = auth.get("sub")
+    username = auth.get("username")
+    email = auth.get("email")
     return JSONResponse({
-        "sub": auth.get("sub"),
+        "user_id": user_id,
+        "sub": user_id,
         "type": auth.get("type", "user"),
-        "username": auth.get("username"),
-        "email": auth.get("email"),
+        "username": username,
+        "email": email,
         "roles": auth.get("roles", []),
         "service": auth.get("service"),
+        "auth_source": auth.get("type", "local"),
     })

@@ -86,8 +86,12 @@ def create_access_token(
         "iat": now,
         "exp": expire,
         "zqm_ai_id": settings.zqm_ai_id,
-        "iss": "zqm-void",
+        "iss": settings.jwt_issuer or "zqm-void",
+        "aud": settings.jwt_audience or "zqm-void",
     }
+
+    typed = (subject.get("type") if isinstance(subject, dict) else None) or "local"
+    payload.setdefault("type", typed)
 
     if isinstance(subject, dict):
         payload.update(subject)
