@@ -1,29 +1,30 @@
-[lint]
-ignore = [
-  "I001",
-  "S110",
-  "BLE001",
-  "ASYNC230",
-  "UP035",
-  "UP017",
-  "F841",
-  "F401",
-  "SIM102",
-  "DTZ003",
-  "RUF012",
-  "PLC3002",
-  "RUF013",
-  "ASYNC221",
-  "UP031",
-  "RUF059",
-  "RUF034",
-  "SIM118",
-  "SIM115",
-  "B008",
-  "F821",
-  "S112",
-  "ISC004",
-  "PIE810",
-  "ASYNC210",
-  "PLW1510",
+line-length = 100
+target-version = "py311"
+exclude = [
+    ".git",
+    "__pycache__",
+    ".venv",
+    "venv",
+    "Python",
+    ".tmp",
+    "**/Python/**",
 ]
+
+[lint]
+select = ["E", "F", "I", "PIE", "PLW", "RUF"]
+ignore = [
+    "E501",
+    "F841",
+    "I001",
+    "S110",
+    "BLE001",
+    "F401",
+    "E402",
+    "PIE810",
+    "PLW1510",
+    "E401",
+    "E741",
+]
+
+[lint.isort]
+known-first-party = ["zqm"]
