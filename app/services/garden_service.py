@@ -5,12 +5,12 @@ Version: 2.0.0 | ZQM Computing LLC
 Client for the ZQM Garden distributed compute cluster.
 Manages job submission, node health, and task coordination.
 
-ZQM Garden Nodes (live mesh nodes with /api/garden/* available):
-  Garden-0 = N4 / ZQM-Void-N4    192.168.1.228  (primary/Queen)
-  Garden-1 = N1 / ZQM-Void-N1    192.168.1.224  (backup/Queen 10)
-  Garden-2 = N3 / ZQM-Node-3     192.168.1.78
-  Garden-3 = N2 / ZQM-Node-2     192.168.1.31
-  Garden-4 = COMB / zqm-void-pve 192.168.1.225
+Actual 2026-08-08 LAN topology:
+  Garden-0 = COMB / zqm-void-pve  192.168.1.225  (primary Queen, compute)
+  Garden-1 = ZQM-Garden-01.lan    192.168.1.172  (backup Queen 10, Synology storage)
+  Garden-2 = ZQM-GARDEN-02.lan    192.168.1.38   (worker, Synology storage)
+  Garden-3 = ZQM-GARDEN-03.lan    192.168.1.64   (worker, Synology storage)
+  Garden-4 = ZQM-GARDEN-04        192.168.1.144  (worker, Noon storage)
 """
 
 from __future__ import annotations
@@ -41,11 +41,11 @@ class GardenService:
     """
 
     GARDEN_NODES = [
-        {"id": "garden-0", "ip": settings.garden_node_0, "api_port": settings.garden_node_0_port, "role": "primary", "gpu": True,  "queen": "Queen"},
-        {"id": "garden-1", "ip": settings.garden_node_1, "api_port": settings.garden_node_1_port, "role": "backup",  "gpu": False, "queen": "Queen 10"},
-        {"id": "garden-2", "ip": settings.garden_node_2, "api_port": settings.garden_node_2_port, "role": "worker",  "gpu": False, "queen": "garden-2"},
-        {"id": "garden-3", "ip": settings.garden_node_3, "api_port": settings.garden_node_3_port, "role": "worker",  "gpu": False, "queen": "garden-3"},
-        {"id": "garden-4", "ip": settings.garden_node_4, "api_port": settings.garden_node_4_port, "role": "worker",  "gpu": False, "queen": "garden-4"},
+        {"id": "garden-0", "ip": settings.garden_node_0, "api_port": settings.garden_node_0_port, "role": "primary", "gpu": True,  "queen": "Queen",      "node_type": "compute"},
+        {"id": "garden-1", "ip": settings.garden_node_1, "api_port": 5000,                               "role": "backup",  "gpu": False, "queen": "Queen 10",   "node_type": "storage"},
+        {"id": "garden-2", "ip": settings.garden_node_2, "api_port": 5000,                               "role": "worker",  "gpu": False, "queen": "garden-2",   "node_type": "storage"},
+        {"id": "garden-3", "ip": settings.garden_node_3, "api_port": 5000,                               "role": "worker",  "gpu": False, "queen": "garden-3",   "node_type": "storage"},
+        {"id": "garden-4", "ip": settings.garden_node_4, "api_port": 443,                               "role": "worker",  "gpu": False, "queen": "garden-4",   "node_type": "storage"},
     ]
 
     def __init__(self) -> None:
@@ -90,6 +90,9 @@ class GardenService:
     async def _ping_node(self, node: Dict[str, Any]) -> bool:
         try:
             async with httpx.AsyncClient(timeout=3) as client:
+                if node.get("node_type") == "storage":
+                    resp = await client.get(self._endpoint(node, "/"))
+                    return resp.status_code < 500
                 resp = await client.get(self._endpoint(node, "/api/garden/health"))
                 return resp.status_code == 200
         except Exception:
@@ -117,7 +120,12 @@ class GardenService:
         return snapshot
 
     async def _probe_node(self, node: Dict[str, Any]) -> Dict[str, Any]:
-        endpoint = self._endpoint(node, "/api/garden/health")
+        if node.get("node_type") == "storage":
+            endpoint = self._endpoint(node, "/")
+            health_path = "/"
+        else:
+            endpoint = self._endpoint(node, "/api/garden/health")
+            health_path = "/api/garden/health"
         try:
             async with httpx.AsyncClient(timeout=3) as client:
                 resp = await client.get(endpoint)
@@ -129,12 +137,14 @@ class GardenService:
                 return {
                     "id": node.get("id"),
                     "ip": node.get("ip"),
-                    "status": "healthy" if resp.status_code == 200 else ("unsupported" if resp.status_code == 404 else "degraded"),
+                    "status": "healthy" if resp.status_code < 500 else ("unsupported" if resp.status_code == 404 else "degraded"),
                     "http_status": resp.status_code,
                     "role": node.get("role"),
                     "gpu": node.get("gpu", False),
                     "queen": node.get("queen"),
+                    "node_type": node.get("node_type", "compute"),
                     "api_port": node.get("api_port", "8808"),
+                    "health_path": health_path,
                     "metrics": data if isinstance(data, dict) else {},
                 }
         except Exception as exc:
@@ -146,7 +156,9 @@ class GardenService:
                 "role": node.get("role"),
                 "gpu": node.get("gpu", False),
                 "queen": node.get("queen"),
+                "node_type": node.get("node_type", "compute"),
                 "api_port": node.get("api_port", "8808"),
+                "health_path": health_path,
             }
 
     async def collect_node_metrics(self) -> Dict[str, Any]:

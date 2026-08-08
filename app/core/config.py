@@ -134,18 +134,18 @@ class Settings(BaseSettings):
     garden_node_3: str = "192.168.1.64"
     garden_node_4: str = "192.168.1.144"
     garden_node_0_port: int = 8808
-    garden_node_1_port: int = 8808
-    garden_node_2_port: int = 8808
-    garden_node_3_port: int = 8808
-    garden_node_4_port: int = 8808
+    garden_node_1_port: int = 5000
+    garden_node_2_port: int = 5000
+    garden_node_3_port: int = 5000
+    garden_node_4_port: int = 443
     garden_timeout: int = 15
     garden_retries: int = 3
     garden_api_ports: Dict[str, int] = {
         "garden-0": 8808,
-        "garden-1": 8808,
-        "garden-2": 8808,
-        "garden-3": 8808,
-        "garden-4": 8808,
+        "garden-1": 5000,
+        "garden-2": 5000,
+        "garden-3": 5000,
+        "garden-4": 443,
     }
 
     # ── ZQM FLATSPACE ──────────────────────────────────────────────────────────────

@@ -43,7 +43,12 @@ class MeshNodeOperations:
         return snapshot
 
     async def _probe_node(self, node: Dict[str, Any]) -> Dict[str, Any]:
-        endpoint = self.garden._endpoint(node, "/api/garden/health")
+        if node.get("node_type") == "storage":
+            endpoint = self.garden._endpoint(node, "/")
+            health_path = "/"
+        else:
+            endpoint = self.garden._endpoint(node, "/api/garden/health")
+            health_path = "/api/garden/health"
         try:
             async with httpx.AsyncClient(timeout=3) as client:
                 resp = await client.get(endpoint)
@@ -55,12 +60,14 @@ class MeshNodeOperations:
                 return {
                     "id": node.get("id"),
                     "ip": node.get("ip"),
-                    "status": "healthy" if resp.status_code == 200 else "degraded",
+                    "status": "healthy" if resp.status_code < 500 else ("unsupported" if resp.status_code == 404 else "degraded"),
                     "http_status": resp.status_code,
                     "role": node.get("role"),
                     "gpu": node.get("gpu", False),
                     "queen": node.get("queen"),
+                    "node_type": node.get("node_type", "compute"),
                     "api_port": node.get("api_port", "8808"),
+                    "health_path": health_path,
                     "metrics": data if isinstance(data, dict) else {},
                 }
         except Exception as exc:
@@ -72,7 +79,9 @@ class MeshNodeOperations:
                 "role": node.get("role"),
                 "gpu": node.get("gpu", False),
                 "queen": node.get("queen"),
+                "node_type": node.get("node_type", "compute"),
                 "api_port": node.get("api_port", "8808"),
+                "health_path": health_path,
             }
 
     async def collect_node_metrics(self) -> Dict[str, Any]:

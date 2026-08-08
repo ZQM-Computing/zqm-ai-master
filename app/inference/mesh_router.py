@@ -52,25 +52,29 @@ def resolve_node_ip(node_id: str, fallback: str) -> str:
 
 
 async def discover_mesh_nodes() -> List[Dict[str, Any]]:
-    """Discover live mesh nodes via /healthz with basic latency scoring."""
+    """Discover live mesh nodes via multiple possible health paths with latency scoring."""
     import urllib.request
+    health_paths = ["/healthz", "/api/healthz", "/api/version"]
     scored: List[Dict[str, Any]] = []
     for node in MESH_NODES:
-        try:
-            t0 = __import__("time").monotonic()
-            req = urllib.request.Request(f"http://{node['ip']}:{node['port']}/healthz", method="GET")
-            with urllib.request.urlopen(req, timeout=5) as r:
-                if r.status == 200:
-                    latency_ms = (__import__("time").monotonic() - t0) * 1000
-                    scored.append({
-                        "id": node["id"],
-                        "ip": node["ip"],
-                        "port": node["port"],
-                        "latency_ms": round(latency_ms, 2),
-                        "healthy": True,
-                    })
-        except Exception:
-            pass
+        for hp in health_paths:
+            try:
+                t0 = __import__("time").monotonic()
+                req = urllib.request.Request(f"http://{node['ip']}:{node['port']}{hp}", method="GET")
+                with urllib.request.urlopen(req, timeout=5) as r:
+                    if r.status == 200:
+                        latency_ms = (__import__("time").monotonic() - t0) * 1000
+                        scored.append({
+                            "id": node["id"],
+                            "ip": node["ip"],
+                            "port": node["port"],
+                            "latency_ms": round(latency_ms, 2),
+                            "healthy": True,
+                            "health_path": hp,
+                        })
+                        break
+            except Exception:
+                continue
     scored.sort(key=lambda n: n.get("latency_ms") or float("inf"))
     return scored
 

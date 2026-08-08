@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sqlite3
 import sys
 import time
@@ -21,6 +22,17 @@ from app.core.config import settings
 DB_PATH = "app/flatspace_local.db"
 INDEX = "flatspace"
 BATCH = 100
+
+
+_MEILI_ID_INVALID = re.compile(r'[^A-Za-z0-9_-]')
+
+
+def _safe_meili_id(raw: str, fallback_index: int) -> str:
+    candidate = _MEILI_ID_INVALID.sub('_', raw)
+    candidate = re.sub(r'_+', '_', candidate).strip('_')
+    if not candidate:
+        candidate = f'doc_{fallback_index}'
+    return candidate[:255]
 
 
 def _headers() -> dict:
@@ -56,13 +68,15 @@ def docs_from_db() -> list[dict]:
     conn.row_factory = sqlite3.Row
     rows = conn.execute("SELECT key, tier, value, metadata, created FROM flatspace").fetchall()
     out = []
-    for row in rows:
+    for i, row in enumerate(rows):
         try:
             val = json.loads(row["value"])
         except Exception:
             val = {"text": row["value"]}
+        raw_key = row["key"]
         doc = {
-            "key": row["key"],
+            "id": _safe_meili_id(raw_key, i),
+            "key": raw_key,
             "tier": row["tier"],
             "value": val,
             "metadata": json.loads(row["metadata"]) if row["metadata"] else {},
