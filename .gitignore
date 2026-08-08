@@ -44,3 +44,14 @@ dist/
 
 # Docker/compose local artifacts
 docker-compose.override.yml
+
+# Build/packaging artifacts
+build/
+*.egg-info/
+
+# Test/cache artifacts
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+tests/__pycache__/
+
