@@ -55,3 +55,9 @@ build/
 .ruff_cache/
 tests/__pycache__/
 
+# Local mesh probe/diagnostics artifacts
+network_probe*.json
+ollama_inventory.json
+openapi_228_*.json
+public_228_probe.json
+
