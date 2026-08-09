@@ -7,7 +7,7 @@ name = "zqm-ai-master"
 version = "0.1.0"
 description = "Void AI orchestration and RAG benchmark harness"
 readme = "README.md"
-license = "Apache-2.0"
+license = "MIT"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.111.0",
