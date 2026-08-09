@@ -13,11 +13,14 @@ import os
 import sys
 from typing import Any
 
+from mesh_connect import resolve_node_ip
+
+
 MESH_NODES = [
-    {"id": "n1", "ip": "192.168.1.224", "port": 8808},
-    {"id": "n2", "ip": "192.168.1.31", "port": 8808},
-    {"id": "n3", "ip": "192.168.1.78", "port": 8808},
-    {"id": "n4", "ip": "192.168.1.228", "port": 8808},
+    {"id": "n1", "ip": resolve_node_ip("N1"), "port": 8808},
+    {"id": "n2", "ip": resolve_node_ip("N2"), "port": 8808},
+    {"id": "n3", "ip": resolve_node_ip("N3"), "port": 8808},
+    {"id": "n4", "ip": resolve_node_ip("N4"), "port": 8808},
 ]
 
 
@@ -34,19 +37,21 @@ def _exclude_stale_sync_paths() -> None:
     os.environ.setdefault("ZQM_IGNORE_ONEDRIVE_SYNC", "1")
 
 
-# Authoritative IP map from LAN sweep and live SSH/health probes on 2026-08-08.
-# Compute nodes run The Void / Ollama; garden nodes are Synology/Noon storage.
+# Authoritative IP map is provided by `mesh_connect.py`; keep as a view here for
+# downstream consumers that still reference `NODE_IP_MAP`.
 NODE_IP_MAP = {
-    "N1": "192.168.1.224",
-    "N2": "192.168.1.31",
-    "N3": "192.168.1.78",
-    "N4": "192.168.1.228",
+    "N1": resolve_node_ip("N1"),
+    "N2": resolve_node_ip("N2"),
+    "N3": resolve_node_ip("N3"),
+    "N4": resolve_node_ip("N4"),
 }
 
 
 def resolve_node_ip(node_id: str, fallback: str) -> str:
-    """Return authoritative mesh IP for a node ID, with safe fallback."""
-    return NODE_IP_MAP.get(node_id.upper(), fallback)
+    """Thin compatibility wrapper so imports from this module keep working."""
+    from mesh_connect import node_ip as _node_ip
+
+    return _node_ip(node_id) or fallback
 
 
 async def discover_mesh_nodes() -> list[dict[str, Any]]:

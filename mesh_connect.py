@@ -24,6 +24,11 @@ def node_ip(node_id: str, fallback: str | None = None) -> str:
     return NODE_IPS.get(node_id.upper(), fallback or "")
 
 
+def resolve_node_ip(node_id: str, fallback: str = "") -> str:
+    """Compatibility wrapper used by mesh_router; prefer NODE_IPS here."""
+    return node_ip(node_id, fallback or "")
+
+
 def all_node_ips() -> Iterable[tuple[str, str]]:
     return sorted(NODE_IPS.items())
 
