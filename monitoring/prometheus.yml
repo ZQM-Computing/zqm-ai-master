@@ -29,3 +29,11 @@ scrape_configs:
         labels:
           node: "N4"
           service: "node"
+
+  - job_name: "rag-bot"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["host.docker.internal:8600"]
+        labels:
+          node: "N4"
+          service: "rag-bot"
