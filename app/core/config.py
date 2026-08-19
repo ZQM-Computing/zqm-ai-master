@@ -80,11 +80,11 @@ class Settings(BaseSettings):
         import socket
         host = socket.gethostname().lower()
         mapping = {
-            "node-1": "Garden-1 (ZQM-Garden-01, 192.168.1.172)",
-            "node-2": "Garden-3 (ZQM-GARDEN-03, 192.168.1.64)",
-            "node-3": "Garden-2 (ZQM-GARDEN-02, 192.168.1.38)",
-            "node-4": "Garden-0 (ZQM-Garden-00, 192.168.1.225)",
-            "node-9": "Garden-4 (ZQM-GARDEN-04, 192.168.1.144)",
+            "node-1": "Garden-0 (ZQM-Garden-00, 192.168.1.228)",
+            "node-2": "Garden-1 (ZQM-Garden-01, 192.168.1.224)",
+            "node-3": "Garden-2 (ZQM-GARDEN-02, 192.168.1.78)",
+            "node-4": "Garden-0 (ZQM-Garden-00, 192.168.1.228)",
+            "node-9": "Garden-4 (ZQM-GARDEN-04, 192.168.1.225)",
         }
         for key, garden in mapping.items():
             if host.endswith(key) or key in host:
@@ -93,7 +93,7 @@ class Settings(BaseSettings):
 
     # Primary garden node: N4 self-referential by default.
     # Real mesh is built at runtime from GARDEN_NODE_* env vars.
-    zqm_ai_primary_garden: str = Field(default="Garden-0 (ZQM-Garden-00, 192.168.1.225)")
+    zqm_ai_primary_garden: str = Field(default="Garden-0 (ZQM-Garden-00, 192.168.1.228)")
 
     # ── Network ───────────────────────────────────────────────────────────────
     host: str = "0.0.0.0"
@@ -122,37 +122,38 @@ class Settings(BaseSettings):
     # ── ZQM Garden ──────────────────────────────────────────────────────────────
     # Live Garden API cluster is the mesh Void nodes themselves.
     # Canonical host IPs:
-    #   Garden-0 = COMB / zqm-void-pve    192.168.1.225  (primary/Queen)
-    #   Garden-1 = ZQM-Garden-01          192.168.1.172  (backup/Queen 11)
-    #   Garden-2 = ZQM-GARDEN-02          192.168.1.38   (worker)
-    #   Garden-3 = ZQM-GARDEN-03          192.168.1.64   (worker)
-    #   Garden-4 = ZQM-GARDEN-04          192.168.1.144  (worker)
-    garden_endpoint: str = "http://192.168.1.225:8808/api/garden/coordinate"
-    garden_node_0: str = "192.168.1.225"
-    garden_node_1: str = "192.168.1.172"
-    garden_node_2: str = "192.168.1.38"
-    garden_node_3: str = "192.168.1.64"
-    garden_node_4: str = "192.168.1.144"
+    #   Garden-0 = N4 / ZQM-Void-N4    192.168.1.228  (primary/Queen)  [DEAD 2026-08-17: ARP Incomplete; bus moved to .217]
+    #   Garden-0 live bus = this host (192.168.1.217:8808) — verified serving /api/garden/* + /api/flatspace/*
+    #   Garden-1 = N1 / ZQM-Void-N1    192.168.1.224  (backup/Queen 10)
+    #   Garden-2 = N3 / ZQM-Node-3     192.168.1.78
+    #   Garden-3 = N2 / ZQM-Node-2     192.168.1.31
+    #   Garden-4 = COMB / zqm-void-pve 192.168.1.225
+    garden_endpoint: str = "http://192.168.1.217:8808/api/garden/coordinate"
+    garden_node_0: str = "192.168.1.217"
+    garden_node_1: str = "192.168.1.224"
+    garden_node_2: str = "192.168.1.78"
+    garden_node_3: str = "192.168.1.31"
+    garden_node_4: str = "192.168.1.225"
     garden_node_0_port: int = 8808
-    garden_node_1_port: int = 5000
-    garden_node_2_port: int = 5000
-    garden_node_3_port: int = 5000
-    garden_node_4_port: int = 443
+    garden_node_1_port: int = 8808
+    garden_node_2_port: int = 8808
+    garden_node_3_port: int = 8808
+    garden_node_4_port: int = 8808
     garden_timeout: int = 15
     garden_retries: int = 3
     garden_api_ports: Dict[str, int] = {
         "garden-0": 8808,
-        "garden-1": 5000,
-        "garden-2": 5000,
-        "garden-3": 5000,
-        "garden-4": 443,
+        "garden-1": 8808,
+        "garden-2": 8808,
+        "garden-3": 8808,
+        "garden-4": 8808,
     }
 
     # ── ZQM FLATSPACE ──────────────────────────────────────────────────────────────
-    flatspace_endpoint: str = "http://192.168.1.225:8808/api/flatspace/store"
-    flatspace_pollen_store: str = "http://192.168.1.225:8808/api/flatspace/pollen"
-    flatspace_bit_garden: str = "http://192.168.1.225:8808/api/flatspace/bitgarden"
-    flatspace_wax_cell: str = "http://192.168.1.225:8808/api/flatspace/waxcell"
+    flatspace_endpoint: str = "http://192.168.1.217:8808/api/flatspace/store"
+    flatspace_pollen_store: str = "http://192.168.1.217:8808/api/flatspace/pollen"
+    flatspace_bit_garden: str = "http://192.168.1.217:8808/api/flatspace/bitgarden"
+    flatspace_wax_cell: str = "http://192.168.1.217:8808/api/flatspace/waxcell"
 
     # ── ZQM Observability ─────────────────────────────────────────────────────
     observability_endpoint: str = "http://127.0.0.1:8808/api/observability/metrics"
@@ -183,66 +184,14 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("meilisearch_default_index", "MEILISEARCH_DEFAULT_INDEX"),
     )
 
-    # ── Chroma Vector Store ───────────────────────────────────────────────────
-    chroma_url: str = Field(
-        default="http://127.0.0.1:8001",
-        validation_alias=AliasChoices("chroma_url", "CHROMA_URL", "CHROMA_HOST"),
-    )
-    chroma_collection: str = Field(
-        default="flatspace",
-        validation_alias=AliasChoices("chroma_collection", "CHROMA_COLLECTION"),
-    )
-    chroma_enabled: bool = Field(
-        default=False,
-        validation_alias=AliasChoices("chroma_enabled", "CHROMA_ENABLED"),
-    )
-
     # ── ZQM Network ───────────────────────────────────────────────────────────
-    network_endpoint: str = "http://192.168.1.228:8808/api/network"
+    network_endpoint: str = "http://192.168.1.217:8808/api/network"
 
-    # ── ZQM Eden ─────────────────────────────────────────────────────────────────
-    eden_endpoint: str = "http://192.168.1.228:8443/api/auth"
+    # ── ZQM Eden ─────────────────────────────────────────────────────────────
+    eden_endpoint: str = "http://192.168.1.217:8443/api/auth"
     eden_enabled: bool = False
 
-    # ── SSO / OIDC ──────────────────────────────────────────────────────────────
-    sso_oidc_issuer: str = Field(
-        default="",
-        validation_alias=AliasChoices("sso_oidc_issuer", "SSO_OIDC_ISSUER"),
-    )
-    sso_oidc_client_id: str = Field(
-        default="",
-        validation_alias=AliasChoices("sso_oidc_client_id", "SSO_OIDC_CLIENT_ID"),
-    )
-    sso_oidc_client_secret: str = Field(
-        default="",
-        validation_alias=AliasChoices("sso_oidc_client_secret", "SSO_OIDC_CLIENT_SECRET"),
-    )
-    sso_oidc_metadata_url: str = Field(
-        default="",
-        validation_alias=AliasChoices("sso_oidc_metadata_url", "SSO_OIDC_METADATA_URL"),
-    )
-    sso_oidc_default_redirect_uri: str = Field(
-        default="",
-        validation_alias=AliasChoices("sso_oidc_default_redirect_uri", "SSO_OIDC_DEFAULT_REDIRECT_URI"),
-    )
-    sso_provider: str = Field(
-        default="",
-        validation_alias=AliasChoices("sso_provider", "SSO_PROVIDER"),
-    )
-    jwt_issuer: str = Field(
-        default="zqm-void",
-        validation_alias=AliasChoices("jwt_issuer", "JWT_ISSUER"),
-    )
-    jwt_audience: str = Field(
-        default="zqm-void",
-        validation_alias=AliasChoices("jwt_audience", "JWT_AUDIENCE"),
-    )
-    refresh_token_ttl_minutes: int = Field(
-        default=60,
-        validation_alias=AliasChoices("refresh_token_ttl_minutes", "REFRESH_TOKEN_TTL_MINUTES"),
-    )
-
-    # ── GitHub Integration ──────────────────────────────────────────────────────
+    # ── GitHub Integration ────────────────────────────────────────────────
     # Target GitHub repository for webhook ingestion and agent actions.
     # Defaults wire to the ZQM-Computing account; override via env if needed.
     github_repo_owner: str = Field(default="zqm-computing")
