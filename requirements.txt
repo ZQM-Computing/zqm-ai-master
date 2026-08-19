@@ -20,7 +20,7 @@ datasets==5.0.1
 defusedxml==0.7.1
 dill==0.4.1
 dnspython==2.8.0
-ecdsa==0.20.0  # CVE: P-256 Minerva timing attack (was 0.19.2)
+ecdsa==0.19.2  # CVE P-256 Minerva timing: NO FIXED VERSION PUBLISHED (max on PyPI is 0.19.2) — advisory unfixed upstream; left pinned
 email-validator==2.3.0
 evaluate==0.4.6
 fastapi==0.115.6  # CVE: pulls starlette>=0.41 (was 0.111.0)
