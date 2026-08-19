@@ -60,13 +60,32 @@ class GardenService:
         return f"http://{node['ip']}:{port}{path}"
 
     async def health_check(self) -> bool:
-        """Ping all configured Garden nodes; True if ANY reachable."""
+        """True if ANY reachable Garden node is healthy.
+
+        Short-circuits: returns as soon as one node reports healthy, so a
+        dead node (e.g. a blackholed storage host) cannot stall the whole
+        /api/status call. Each ping carries its own bounded timeout (see
+        _ping_node) so an all-dead fleet still resolves quickly instead of
+        hanging on the slowest dead host.
+        """
+        pending = {
+            asyncio.create_task(self._ping_node(node)): node
+            for node in self.GARDEN_NODES
+        }
         try:
-            results = await asyncio.gather(
-                *[self._ping_node(node) for node in self.GARDEN_NODES],
-                return_exceptions=True,
-            )
-            return any(r is True for r in results)
+            while pending:
+                done, pending = await asyncio.wait(
+                    pending, return_when=asyncio.FIRST_COMPLETED
+                )
+                for task in done:
+                    try:
+                        if task.result() is True:
+                            for t in pending:
+                                t.cancel()
+                            return True
+                    except Exception:
+                        pass
+            return False
         except Exception:
             return False
 
@@ -89,7 +108,7 @@ class GardenService:
 
     async def _ping_node(self, node: Dict[str, Any]) -> bool:
         try:
-            async with httpx.AsyncClient(timeout=3) as client:
+            async with httpx.AsyncClient(timeout=2.0) as client:
                 if node.get("node_type") == "storage":
                     resp = await client.get(self._endpoint(node, "/"))
                     return resp.status_code < 500
@@ -127,7 +146,7 @@ class GardenService:
             endpoint = self._endpoint(node, "/api/garden/health")
             health_path = "/api/garden/health"
         try:
-            async with httpx.AsyncClient(timeout=3) as client:
+            async with httpx.AsyncClient(timeout=2.0) as client:
                 resp = await client.get(endpoint)
                 data: Dict[str, Any] = {}
                 try:
@@ -369,7 +388,7 @@ class GardenService:
 
     async def _get_node_metrics(self, node: Dict[str, Any]) -> Dict[str, Any]:
         try:
-            async with httpx.AsyncClient(timeout=5) as client:
+            async with httpx.AsyncClient(timeout=2.0) as client:
                 resp = await client.get(
                     self._endpoint(node, "/api/garden/metrics"),
                     headers={"X-ZQM_AI-ID": settings.zqm_ai_id},

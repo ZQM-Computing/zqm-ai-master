@@ -10,12 +10,14 @@ from __future__ import annotations
 import socket
 from typing import Dict, Iterable, Tuple
 
-# Canonical node IPs as of 2026-08-08.
+# Canonical node IPs. 2026-08-19: N2 aligned to mesh_router.py (.31); N4=.228 is
+# STALE (host gone from LAN, ARP Incomplete) — verified DOWN. Only N1-class local
+# host .217 (not in this map) currently serves Ollama. Update when nodes return.
 NODE_IPS: Dict[str, str] = {
     "N1": "192.168.1.224",
-    "N2": "192.168.1.196",
+    "N2": "192.168.1.31",
     "N3": "192.168.1.78",
-    "N4": "192.168.1.228",
+    "N4": "192.168.1.228",  # STALE: host absent from LAN
     "N9": "192.168.1.250",
 }
 

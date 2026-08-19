@@ -122,13 +122,14 @@ class Settings(BaseSettings):
     # ── ZQM Garden ──────────────────────────────────────────────────────────────
     # Live Garden API cluster is the mesh Void nodes themselves.
     # Canonical host IPs:
-    #   Garden-0 = COMB / zqm-void-pve    192.168.1.225  (primary/Queen)
+    #   Garden-0 = COMB / zqm-void-pve    192.168.1.225  (primary/Queen)  [225:8808 answers but 404s on /api/garden/* + /api/flatspace/* — not a usable bus]
+    #   Garden-0 live bus = this host (192.168.1.217:8808) — VERIFIED serving /api/garden/* (200/405) + /api/flatspace/* (405). Repointed 2026-08-17.
     #   Garden-1 = ZQM-Garden-01          192.168.1.172  (backup/Queen 11)
     #   Garden-2 = ZQM-GARDEN-02          192.168.1.38   (worker)
     #   Garden-3 = ZQM-GARDEN-03          192.168.1.64   (worker)
     #   Garden-4 = ZQM-GARDEN-04          192.168.1.144  (worker)
-    garden_endpoint: str = "http://192.168.1.225:8808/api/garden/coordinate"
-    garden_node_0: str = "192.168.1.225"
+    garden_endpoint: str = "http://192.168.1.217:8808/api/garden/coordinate"
+    garden_node_0: str = "192.168.1.217"
     garden_node_1: str = "192.168.1.172"
     garden_node_2: str = "192.168.1.38"
     garden_node_3: str = "192.168.1.64"
@@ -149,10 +150,10 @@ class Settings(BaseSettings):
     }
 
     # ── ZQM FLATSPACE ──────────────────────────────────────────────────────────────
-    flatspace_endpoint: str = "http://192.168.1.225:8808/api/flatspace/store"
-    flatspace_pollen_store: str = "http://192.168.1.225:8808/api/flatspace/pollen"
-    flatspace_bit_garden: str = "http://192.168.1.225:8808/api/flatspace/bitgarden"
-    flatspace_wax_cell: str = "http://192.168.1.225:8808/api/flatspace/waxcell"
+    flatspace_endpoint: str = "http://192.168.1.217:8808/api/flatspace/store"
+    flatspace_pollen_store: str = "http://192.168.1.217:8808/api/flatspace/pollen"
+    flatspace_bit_garden: str = "http://192.168.1.217:8808/api/flatspace/bitgarden"
+    flatspace_wax_cell: str = "http://192.168.1.217:8808/api/flatspace/waxcell"
 
     # ── ZQM Observability ─────────────────────────────────────────────────────
     observability_endpoint: str = "http://127.0.0.1:8808/api/observability/metrics"
@@ -198,10 +199,10 @@ class Settings(BaseSettings):
     )
 
     # ── ZQM Network ───────────────────────────────────────────────────────────
-    network_endpoint: str = "http://192.168.1.228:8808/api/network"
+    network_endpoint: str = "http://192.168.1.217:8808/api/network"
 
     # ── ZQM Eden ─────────────────────────────────────────────────────────────────
-    eden_endpoint: str = "http://192.168.1.228:8443/api/auth"
+    eden_endpoint: str = "http://192.168.1.217:8443/api/auth"
     eden_enabled: bool = False
 
     # ── SSO / OIDC ──────────────────────────────────────────────────────────────

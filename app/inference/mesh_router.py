@@ -19,7 +19,10 @@ MESH_NODES = [
     {"id": "n1", "ip": "192.168.1.224", "port": 8808},
     {"id": "n2", "ip": "192.168.1.31", "port": 8808},
     {"id": "n3", "ip": "192.168.1.78", "port": 8808},
-    {"id": "n4", "ip": "192.168.1.228", "port": 8808},
+    # 2026-08-19: n4/.228 is STALE — host gone from LAN (ARP Incomplete). Kept as a
+    # non-probed entry for reference only; route_inference/distributed_chat skip
+    # unreachable nodes, so it is harmless but must not be treated as live.
+    {"id": "n4", "ip": "192.168.1.228", "port": 8808, "stale": True},
 ]
 
 
@@ -36,8 +39,10 @@ def _exclude_stale_sync_paths() -> None:
     os.environ.setdefault("ZQM_IGNORE_ONEDRIVE_SYNC", "1")
 
 
-# Authoritative IP map from LAN sweep and live SSH/health probes on 2026-08-08.
-# Compute nodes run The Void / Ollama; garden nodes are Synology/Noon storage.
+# Authoritative IP map. 2026-08-19: n4/.228 STALE (host gone from LAN, ARP
+# Incomplete); all remote mesh nodes (.224/.31/.78/.228) currently UNREACHABLE.
+# Only LOCAL (.217:8808) is live — see app/services/mesh_ollama.py DEFAULT_BACKENDS
+# (LOCAL-only). Keep these entries for reference; route_inference skips dead nodes.
 NODE_IP_MAP = {
     "N1": "192.168.1.224",
     "N2": "192.168.1.31",

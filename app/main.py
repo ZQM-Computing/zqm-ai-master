@@ -24,6 +24,9 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from app.core.config import settings
+from dotenv import load_dotenv
+
+load_dotenv()  # populate os.environ from .env (needed by quantum_llm_bridge etc.)
 from app.core.logger import configure_logging, get_logger
 from app.core.security import get_current_token_payload, require_admin
 from app.models.response import ErrorResponse

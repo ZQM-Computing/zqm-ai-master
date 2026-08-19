@@ -25,12 +25,14 @@ log = get_logger("mesh_ollama")
 
 from mesh_connect import NODE_IPS
 
-# Default mesh topology: N2, N3, N4 are compute nodes with Ollama.
-# N1 is a management/gateway node without Ollama.
+# 2026-08-19: N2/N3/N4 Ollama backends are VERIFIED DOWN (all unreachable on
+# 192.168.1.31 / .78 / .228; only LOCAL .217:11434 answers). Run the mesh LOCAL-only
+# so the health refresh no longer spends 6-8s per dead node (which made /api/status
+# hang ~10s and report healthy=[]). LOCAL (.217) carries all 46 models incl. every
+# probe candidate (qwen2.5:0.5b/3b, llama3.2:3b, llama3.1:8b, mistral:7b, deepseek-r1:1.5b).
+# Re-add remote backends below once those nodes return.
 DEFAULT_BACKENDS: List[Dict[str, Any]] = [
-    {"name": "N2", "url": f"http://{NODE_IPS['N2']}:11434", "local": False},
-    {"name": "N3", "url": f"http://{NODE_IPS['N3']}:11434", "local": False},
-    {"name": "N4", "url": f"http://{NODE_IPS['N4']}:11434", "local": False},
+    {"name": "LOCAL", "url": "http://127.0.0.1:11434", "local": True},
 ]
 
 _CIRCUIT_TRIP = 3

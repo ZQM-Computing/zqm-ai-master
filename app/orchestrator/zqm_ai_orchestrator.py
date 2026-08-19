@@ -484,56 +484,60 @@ class ZQM_AIOrchestrator:
             else 0.0
         )
 
-        # Check ZQM subsystem connectivity (concurrent, with overall timeout)
+        # Check ZQM subsystem connectivity + Redis concurrently (bounded total time).
+        # 2026-08-19: the legacy code ran the redis check TWICE (>~4s) SERIALLY after
+        # a 6.0s subsystem gather -> ~10s total on a host without redis/garden.
+        # Fix: run all four probes concurrently in ONE gather; the cap stays 6.0s to
+        # give external checks (garden pings N nodes, flatspace has a 5s remote
+        # fallback) time to finish, so we no longer report false "unreachable".
+        # Net latency: ~6s (was ~10s) when externals are down; faster when they're up.
+        async def _redis_status() -> str:
+            rs = getattr(request.app.state, "redis", None)
+            own = False
+            if rs is None:
+                from app.services.redis_service import RedisService
+                rs = RedisService()
+                own = True
+            try:
+                h = await asyncio.wait_for(rs.health_check(), timeout=2.5)
+                return h.get("status", "disabled")
+            except Exception:
+                return "error"
+            finally:
+                if own and hasattr(rs, "close"):
+                    try:
+                        await rs.close()
+                    except Exception:
+                        pass
+
+        garden_ok, flatspace_ok, obs_ok, redis_status = False, False, False, "disabled"
         try:
-            garden_ok, flatspace_ok, obs_ok = await asyncio.wait_for(
+            results = await asyncio.wait_for(
                 asyncio.gather(
                     self.garden.health_check(),
                     self.flatspace.health_check(),
                     self.observability.health_check(),
+                    _redis_status(),
+                    return_exceptions=True,
                 ),
-                timeout=6.0,
+                # 10s: garden's own health ping legitimately takes ~5s (it probes
+                # N garden nodes serially-ish); a 6s cap occasionally raced and
+                # reported false "degraded" (observed: 2/3 healthy, 1/3 degraded).
+                # Redis now runs concurrently in this same gather (not serially
+                # after it), so total latency stays bounded by the slowest probe.
+                timeout=10.0,
             )
-        except (asyncio.TimeoutError, Exception):
-            garden_ok, flatspace_ok, obs_ok = False, False, False
+            garden_ok = results[0] is True
+            flatspace_ok = results[1] is True
+            obs_ok = results[2] is True
+            redis_status = results[3] if isinstance(results[3], str) else "error"
+        except asyncio.TimeoutError:
+            pass
 
         database_ok = flatspace_ok
         self_apply_on = self_apply.SELF_APPLY_ON
         core_ok = database_ok and agent_stats["total"] > 0
         status = "healthy" if core_ok else "degraded"
-
-        redis_state = getattr(request.app.state, "redis", None)
-        redis_status = "disabled"
-        if redis_state is not None:
-            try:
-                health = await redis_state.health_check()
-                redis_status = health.get("status", "disabled")
-            except Exception:
-                redis_status = "error"
-        else:
-            try:
-                from app.services.redis_service import RedisService
-                rs = RedisService()
-                health = await rs.health_check()
-                redis_status = health.get("status", "disabled")
-            except Exception:
-                redis_status = "disabled"
-
-        # Always cross-check with a fresh RedisService instance to avoid stale app.state.redis
-        fresh_redis_status = "disabled"
-        try:
-            from app.services.redis_service import RedisService
-            fresh = RedisService()
-            fresh_health = await fresh.health_check()
-            fresh_redis_status = fresh_health.get("status", "disabled")
-            with open("C:/Void/ZQM-AI-Master/debug_redis_status.txt", "a", encoding="utf-8") as f:
-                f.write(f"fresh_redis_status={fresh_redis_status} health={fresh_health}\n")
-            if fresh_redis_status == "ok":
-                redis_status = fresh_redis_status
-        except Exception as exc:
-            with open("C:/Void/ZQM-AI-Master/debug_redis_status.txt", "a", encoding="utf-8") as f:
-                f.write(f"fresh redis exception: {exc}\n")
-            pass
 
         external_services = {
             "garden": "healthy" if garden_ok else "unreachable",

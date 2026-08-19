@@ -14,6 +14,7 @@ as intelligence payloads, triggering cognitive processing.
 Mounted at /api/webhook/*
 """
 
+import asyncio
 import hashlib
 import hmac
 import json
@@ -25,6 +26,8 @@ from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Header, HTTPException, Request, status
 from pydantic import BaseModel, Field
+
+from app.models.task import TaskRequest, CognitiveLevel, InputMethod
 
 logger = logging.getLogger("zqm_ai.webhook")
 
@@ -182,12 +185,20 @@ async def _ingest_webhook_event(
         except Exception as exc:
             logger.warning("[webhook] flatspace audit failed: %s", exc)
 
-        # 3) create a task so The Void acts on the event
+        # 3) create a task so The Void acts on the event.
+        #    NOTE: the orchestrator exposes execute_task(TaskRequest), not submit_task().
+        #    Fire-and-forget: schedule the task on the event loop instead of awaiting it,
+        #    so the webhook returns immediately (execute_task may block on redis/flatspace
+        #    and must NOT hold the HTTP response). Failures are logged via the task's own
+        #    error path; the webhook stays responsive (status=received) regardless.
         try:
-            orch.submit_task(
+            task_req = TaskRequest(
                 input=f"Webhook {source}/{event_type}: {data.get('summary', str(data)[:120])}",
-                cognitive_level="basic",
+                cognitive_level=CognitiveLevel.BASIC,
+                input_method=InputMethod.API_INTEGRATIONS,
+                context={"source": source, "event_type": event_type, "payload": data},
             )
+            asyncio.create_task(orch.execute_task(task_req))
         except Exception as exc:
             logger.warning("[webhook] task creation failed: %s", exc)
 
@@ -538,16 +549,28 @@ async def _handle_azure_generic(resource: dict, payload: dict) -> dict:
 
 
 @router.post("/deploy", summary="Generic deployment notification")
-async def deploy_webhook(deploy: DeploymentWebhook):
+async def deploy_webhook(
+    deploy: DeploymentWebhook,
+    x_zqm_key: Optional[str] = Header(None, alias="X-ZQM-Key"),
+):
     """
     Receive deployment notifications from any CI/CD system.
 
     curl example:
-        curl -X POST http://localhost:8808/api/webhook/deploy \\
-          -H "Content-Type: application/json" \\
-          -H "X-ZQM-Key: ${ZQM_INTERNAL_KEY}" \\
+        curl -X POST http://localhost:8808/api/webhook/deploy \
+          -H "Content-Type: application/json" \
+          -H "X-ZQM-Key: ${ZQM_INTERNAL_KEY}" \
           -d '{"app_name":"zqm-void","status":"success","environment":"development"}'
     """
+    # Authenticate when a shared key is configured. Mirrors the /github receiver:
+    # with ZQM_INTERNAL_KEY set, the X-ZQM-Key header is required and verified;
+    # with it unset the endpoint stays in dev-mode (no auth) for local testing.
+    if ZQM_INTERNAL_KEY:
+        if not x_zqm_key:
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Missing X-ZQM-Key header")
+        if not hmac.compare_digest(x_zqm_key, ZQM_INTERNAL_KEY):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Invalid X-ZQM-Key")
+
     severity = "failed" if deploy.status == "failed" else "info"
 
     summary = (

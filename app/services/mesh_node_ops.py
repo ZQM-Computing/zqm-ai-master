@@ -50,7 +50,7 @@ class MeshNodeOperations:
             endpoint = self.garden._endpoint(node, "/api/garden/health")
             health_path = "/api/garden/health"
         try:
-            async with httpx.AsyncClient(timeout=3) as client:
+            async with httpx.AsyncClient(timeout=2.0) as client:
                 resp = await client.get(endpoint)
                 data: Dict[str, Any] = {}
                 try:

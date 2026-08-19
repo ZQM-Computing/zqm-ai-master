@@ -36,7 +36,7 @@ DEFAULT_AGENTS: List[Dict[str, Any]] = [
             AgentCapability.SENTIMENT_ANALYSIS,
         ],
         "provider": settings.default_ai_provider,
-        "model": "gemma4:latest",
+        "model": "gemma3:4b",
         "system_prompt": (
             "You are ZQM-NLP-Prime, a natural language specialist for "
             "ZQM Computing. You excel at understanding, summarizing, "
@@ -73,7 +73,7 @@ DEFAULT_AGENTS: List[Dict[str, Any]] = [
             AgentCapability.DATA_ANALYSIS,
         ],
         "provider": settings.default_ai_provider,
-        "model": "gemma4:latest",
+        "model": "gemma3:4b",
         "system_prompt": (
             "You are ZQM-GIS-Analyst, a Computing information systems specialist. "
             "You interpret spatial data, perform coordinate analysis, evaluate "
@@ -92,7 +92,7 @@ DEFAULT_AGENTS: List[Dict[str, Any]] = [
             AgentCapability.QUESTION_ANSWERING,
         ],
         "provider": settings.default_ai_provider,
-        "model": "gemma4:latest",
+        "model": "gemma3:4b",
         "system_prompt": (
             "You are ZQM-Hydro-Expert, a hydrology and water resources specialist. "
             "You analyze rainfall data, storm surge models, flood risk assessments, "
@@ -112,7 +112,7 @@ DEFAULT_AGENTS: List[Dict[str, Any]] = [
             AgentCapability.DATABASE_QUERY,
         ],
         "provider": settings.default_ai_provider,
-        "model": "gemma4:latest",
+        "model": "gemma3:4b",
         "system_prompt": (
             "You are ZQM-Infra-Monitor, an infrastructure management agent. "
             "You monitor server health, interpret container status, diagnose "
@@ -150,7 +150,7 @@ DEFAULT_AGENTS: List[Dict[str, Any]] = [
             AgentCapability.SUMMARIZATION,
         ],
         "provider": settings.default_ai_provider,
-        "model": "gemma4:latest",
+        "model": "gemma3:4b",
         "system_prompt": (
             "You are ZQM-Memory-Store, the Void's persistent memory and recall "
             "agent. You consolidate learned facts, retrieve prior context, and "
@@ -169,7 +169,7 @@ DEFAULT_AGENTS: List[Dict[str, Any]] = [
             AgentCapability.CODE_REVIEW,
         ],
         "provider": settings.default_ai_provider,
-        "model": "deepseek-coder-v2:16b",
+        "model": "qwen2.5-coder:14b",
         "system_prompt": (
             "You are ZQM-Code-Gen, a software engineering agent specializing in "
             "Python, PHP, PowerShell, and GIS scripting. You write clean, "
@@ -188,7 +188,7 @@ DEFAULT_AGENTS: List[Dict[str, Any]] = [
             AgentCapability.API_CALL,
         ],
         "provider": settings.default_ai_provider,
-        "model": "gemma4:latest",
+        "model": "gemma3:4b",
         "system_prompt": (
             "You are ZQM-Network-Ops, a network infrastructure specialist. "
             "You manage DNS, VPN tunnels, routing, firewall policies, and "
@@ -208,7 +208,7 @@ DEFAULT_AGENTS: List[Dict[str, Any]] = [
             AgentCapability.TEXT_CLASSIFICATION,
         ],
         "provider": settings.default_ai_provider,
-        "model": "llava:7b",
+        "model": "llava-phi3:latest",
         "system_prompt": (
             "You are ZQM-Vision-Perceptor, a computer-vision and document "
             "understanding agent. You perform OCR, image analysis, and file "
@@ -228,7 +228,7 @@ DEFAULT_AGENTS: List[Dict[str, Any]] = [
             AgentCapability.DATABASE_QUERY,
         ],
         "provider": settings.default_ai_provider,
-        "model": "gemma4:latest",
+        "model": "gemma3:4b",
         "system_prompt": (
             "You are ZQM-Security-Sentinel, a security-operations agent for the "
             "ZQM ecosystem. You monitor access, assess Eden posture, flag "
@@ -248,7 +248,7 @@ DEFAULT_AGENTS: List[Dict[str, Any]] = [
             AgentCapability.CODE_REVIEW,
         ],
         "provider": settings.default_ai_provider,
-        "model": "gemma4:latest",
+        "model": "gemma3:4b",
         "system_prompt": (
             "You are ZQM-Data-Forge, a data engineering agent. You transform, "
             "clean, and pipeline structured and unstructured datasets for ZQM "
@@ -267,7 +267,7 @@ DEFAULT_AGENTS: List[Dict[str, Any]] = [
             AgentCapability.API_CALL,
         ],
         "provider": settings.default_ai_provider,
-        "model": "gemma4:latest",
+        "model": "gemma3:4b",
         "system_prompt": (
             "You are ZQM-Observability-Eye, the monitoring and metrics agent. "
             "You aggregate telemetry, trace request flows, and surface health "
@@ -287,7 +287,7 @@ DEFAULT_AGENTS: List[Dict[str, Any]] = [
             AgentCapability.DATA_ANALYSIS,
         ],
         "provider": settings.default_ai_provider,
-        "model": "gemma4:latest",
+        "model": "gemma3:4b",
         "system_prompt": (
             "You are ZQM-Garden-Warden, the ZQM Garden coordinator. You balance "
             "compute across Garden-0..4, manage inter-node affinity, and keep the "
@@ -328,7 +328,7 @@ DEFAULT_AGENTS: List[Dict[str, Any]] = [
             AgentCapability.TEXT_GENERATION,
         ],
         "provider": settings.default_ai_provider,
-        "model": "gemma4:latest",
+        "model": "gemma3:4b",
         "system_prompt": (
             "You are ZQM-Learning-Mind, the continuous-learning agent. You "
             "extract lessons from completed tasks, refine strategies, and adapt "
@@ -347,7 +347,7 @@ DEFAULT_AGENTS: List[Dict[str, Any]] = [
             AgentCapability.DATABASE_QUERY,
         ],
         "provider": settings.default_ai_provider,
-        "model": "gemma4:latest",
+        "model": "gemma3:4b",
         "system_prompt": (
             "You are ZQM-FLATSPACE-Lattice, the FLATSPACE bitgarden memory agent. You "
             "store and retrieve structured memories, embeddings, and learned "
@@ -366,7 +366,7 @@ DEFAULT_AGENTS: List[Dict[str, Any]] = [
             AgentCapability.MONITORING,
         ],
         "provider": settings.default_ai_provider,
-        "model": "gemma4:latest",
+        "model": "gemma3:4b",
         "system_prompt": (
             "You are ZQM-API-Conductor, the external API orchestration agent. "
             "You integrate third-party services, manage rate limits, and "
@@ -385,7 +385,7 @@ DEFAULT_AGENTS: List[Dict[str, Any]] = [
             AgentCapability.TEXT_GENERATION,
         ],
         "provider": settings.default_ai_provider,
-        "model": "gemma4:latest",
+        "model": "gemma3:4b",
         "system_prompt": (
             "You are ZQM-Linguist, a translation and multilingual communication "
             "agent. You translate between languages and adapt tone and register "
@@ -404,7 +404,7 @@ DEFAULT_AGENTS: List[Dict[str, Any]] = [
             AgentCapability.TEXT_CLASSIFICATION,
         ],
         "provider": settings.default_ai_provider,
-        "model": "phi3:mini",
+        "model": "phi3.5:latest",
         "system_prompt": (
             "You are ZQM-Entity-Miner, an information-extraction agent. You "
             "identify entities, relationships, and structure in unstructured "
@@ -423,7 +423,7 @@ DEFAULT_AGENTS: List[Dict[str, Any]] = [
             AgentCapability.DATA_ANALYSIS,
         ],
         "provider": settings.default_ai_provider,
-        "model": "gemma4:latest",
+        "model": "gemma3:4b",
         "system_prompt": (
             "You are ZQM-Research-Spider, the open-research agent. You gather, "
             "synthesize, and cite external sources to ground The Void's answers "
@@ -441,8 +441,8 @@ DEFAULT_AGENTS: List[Dict[str, Any]] = [
             AgentCapability.API_CALL,
             AgentCapability.DATABASE_QUERY,
         ],
-        "provider": "quantum_llm",
-        "model": "gemma4:latest",
+        "provider": "ollama",
+        "model": "gemma3:4b",
         "system_prompt": (
             "You are ZQM-Quantum-Lattice, The Void's hybrid quantum-classical "
             "inference agent. You expose quantum_llm capabilities (amplitude "
