@@ -286,11 +286,25 @@ class CognitiveProcessor:
         trace.memory_writes += 1
 
         if request.session_id:
-            history = f"Q: {request.input}\nA: {result.output}"
+            new_entry = f"Q: {request.input}\nA: {result.output}"
+            # Append to existing session history instead of overwriting it, so
+            # prior turns survive across calls (fixes the "memory reverts every
+            # few calls" bug — the old code replaced the whole key each time).
+            if session_context:
+                full_history = f"{session_context}\n\n{new_entry}"
+            else:
+                full_history = new_entry
+            # Cap retained history to the most recent turns so the fed-back
+            # "Previous conversation" context stays bounded in size.
+            _MAX_HISTORY_BLOCKS = 20
+            blocks = [b for b in full_history.split("\n\n") if b.strip()]
+            if len(blocks) > _MAX_HISTORY_BLOCKS:
+                blocks = blocks[-_MAX_HISTORY_BLOCKS:]
+                full_history = "\n\n".join(blocks)
             await self._cache.set(
                 f"session:{request.session_id}",
-                history,
-                ttl=3600,
+                full_history,
+                ttl=86400,
                 tags=[f"session:{request.session_id}"],
             )
             trace.memory_writes += 1
