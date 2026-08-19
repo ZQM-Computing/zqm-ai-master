@@ -28,6 +28,32 @@ def _fs(request: Request):
     return request.app.state.orchestrator.flatspace
 
 
+@router.get(
+    "/health",
+    summary="FLATSPACE liveness",
+    description="Lightweight liveness probe. Returns 200 when the FLATSPACE "
+    "service is reachable (local store or remote backend), 503 otherwise.",
+)
+async def health(
+    request: Request,
+    auth: Dict[str, Any] = Depends(get_current_token_payload),
+) -> JSONResponse:
+    fs = _fs(request)
+    try:
+        ok = await fs.health_check()
+    except Exception:
+        ok = False
+    if ok:
+        return JSONResponse(
+            status_code=200,
+            content={"status": "ok", "flatspace": "reachable"},
+        )
+    return JSONResponse(
+        status_code=503,
+        content={"status": "degraded", "flatspace": "unreachable"},
+    )
+
+
 @router.post(
     "/store",
     summary="Store a memory record",
