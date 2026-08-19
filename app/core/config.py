@@ -114,7 +114,10 @@ class Settings(BaseSettings):
 
     # ── Redis / VoidCache ────────────────────────────────────────────────────
     redis_url: str = "redis://localhost:6379/0"
-    redis_password: str = ""
+    redis_password: str = Field(
+        default="",
+        validation_alias=AliasChoices("redis_password", "REDIS_PASSWORD"),
+    )
     cache_ttl_seconds: int = 3600
     void_cache_max_size: int = 512
     void_cache_strategy: Literal["LRU", "LFU", "FIFO"] = "LRU"

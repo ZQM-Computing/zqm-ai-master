@@ -53,8 +53,6 @@ class RedisService:
             log.info("Redis connected")
             return True
         except Exception as exc:
-            with open("C:/Void/ZQM-AI-Master/debug_redis_connect.txt", "a", encoding="utf-8") as f:
-                f.write(f"connect_error={type(exc).__name__}: {exc}\n")
             log.debug("Redis connect failed", error=str(exc))
             self._client = None
             return False
@@ -70,42 +68,26 @@ class RedisService:
 
     async def health_check(self) -> Dict[str, Any]:
         """Return Redis health status."""
-        with open("C:/Void/ZQM-AI-Master/debug_redis_service.txt", "a", encoding="utf-8") as dbg:
-            dbg.write(f"health_check called enabled={self._enabled} available={_REDIS_AVAILABLE} client={self._client}\n")
         if not self._enabled or not _REDIS_AVAILABLE:
             return {"status": "disabled", "redis_url": self._url or ""}
         try:
             if self._client is None:
-                with open("C:/Void/ZQM-AI-Master/debug_redis_service.txt", "a", encoding="utf-8") as dbg:
-                    dbg.write("client is None, connecting...\n")
                 connected = await self.connect()
-                with open("C:/Void/ZQM-AI-Master/debug_redis_service.txt", "a", encoding="utf-8") as dbg:
-                    dbg.write(f"connected={connected} client={self._client}\n")
             else:
                 try:
                     await self._client.ping()
                     connected = True
-                    with open("C:/Void/ZQM-AI-Master/debug_redis_service.txt", "a", encoding="utf-8") as dbg:
-                        dbg.write("ping ok\n")
-                except Exception as exc:
+                except Exception:
                     connected = False
-                    with open("C:/Void/ZQM-AI-Master/debug_redis_service.txt", "a", encoding="utf-8") as dbg:
-                        dbg.write(f"ping failed: {exc}\n")
             if connected and self._client is not None:
                 try:
                     info = await self._client.info("server")
                     version = info.get("redis_version", "unknown")
-                    with open("C:/Void/ZQM-AI-Master/debug_redis_service.txt", "a", encoding="utf-8") as dbg:
-                        dbg.write(f"info ok version={version}\n")
-                except Exception as exc:
+                except Exception:
                     version = "unknown"
-                    with open("C:/Void/ZQM-AI-Master/debug_redis_service.txt", "a", encoding="utf-8") as dbg:
-                        dbg.write(f"info failed: {exc}\n")
                 return {"status": "ok", "redis_url": self._url, "version": version}
             return {"status": "unreachable", "redis_url": self._url}
         except Exception as exc:
-            with open("C:/Void/ZQM-AI-Master/debug_redis_service.txt", "a", encoding="utf-8") as dbg:
-                dbg.write(f"exception: {exc}\n")
             return {"status": "error", "redis_url": self._url, "error": str(exc)[:200]}
 
     async def push_metric(self, key: str, payload: Dict[str, Any], ttl: int = 300) -> bool:
